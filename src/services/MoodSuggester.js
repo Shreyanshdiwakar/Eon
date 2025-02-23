@@ -2,10 +2,10 @@ class MoodSuggester {
     constructor(statsManager) {
         this.statsManager = statsManager;
         this.timePatterns = {
-            morning: ['working', 'normal', 'happy'],
-            afternoon: ['working', 'eating', 'normal'],
-            evening: ['tired', 'eating', 'normal'],
-            night: ['sleeping', 'tired', 'normal']
+            morning: ['normal', 'working', 'happy'],
+            afternoon: ['working', 'normal', 'eating'],
+            evening: ['normal', 'eating', 'celebration'],
+            night: ['normal', 'tired', 'relaxing']
         };
     }
 
