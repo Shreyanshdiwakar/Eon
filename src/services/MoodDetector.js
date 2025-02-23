@@ -1,7 +1,8 @@
-const vaderSentiment = require('vader-sentiment');
+const vader = require('vader-sentiment');
 
 class MoodDetector {
     constructor() {
+        console.log('🔧 Initializing MoodDetector...');
         // Updated emotion mappings to match your images
         this.emotionMappings = {
             // High positive emotions
@@ -36,7 +37,7 @@ class MoodDetector {
     async analyzeMood(message) {
         try {
             const lowerMessage = message.toLowerCase();
-            const intensity = vaderSentiment.SentimentIntensityAnalyzer.polarity_scores(message);
+            const intensity = vader.SentimentIntensityAnalyzer.polarity_scores(message);
 
             // First check for specific keywords
             for (const [mood, keywords] of Object.entries(this.emotionMappings)) {
@@ -65,59 +66,69 @@ class MoodDetector {
         }
     }
 
-    async getDetailedAnalysis(message) {
+    async getDetailedAnalysis(text) {
         try {
-            const intensity = vaderSentiment.SentimentIntensityAnalyzer.polarity_scores(message);
-            let mood = 'normal';
-
-            // Check for specific keywords first
-            for (const [emotion, keywords] of Object.entries(this.emotionMappings)) {
-                if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
-                    // Special handling for food-related messages
-                    if (emotion === 'food') {
-                        mood = Math.random() < 0.5 ? 'eating' : 'eating1';
-                    } else {
-                        mood = emotion;
-                    }
-                    break;
-                }
-            }
-
-            // If no keywords found, use sentiment analysis
-            const compound = intensity.compound;
+            console.log(`\n🔍 Analyzing text: "${text}"`);
             
-            if (compound >= this.thresholds.high_pos) {
-                return 'happy';
-            } else if (compound <= this.thresholds.high_neg) {
-                return 'tired';
-            } else if (compound <= this.thresholds.low_neg) {
-                return 'confused';
-            } else if (compound >= this.thresholds.low_pos) {
-                return 'normal';
+            // Get VADER sentiment scores
+            const intensity = vader.SentimentIntensityAnalyzer.polarity_scores(text);
+            console.log('📊 VADER scores:', intensity);
+
+            // Determine mood based on compound score
+            let mood = 'normal';  // default mood
+            
+            if (intensity.compound >= 0.5) {
+                mood = 'happy';
+            } else if (intensity.compound <= -0.5) {
+                mood = 'tired';  // using tired for negative emotions
+            } else if (intensity.compound > 0.2) {
+                mood = 'celebration';
+            } else if (intensity.compound < -0.2) {
+                mood = 'confused';
             }
+
+            // Check for specific keywords
+            const lowerText = text.toLowerCase();
+            if (lowerText.includes('sleep') || lowerText.includes('tired')) {
+                mood = 'sleeping';
+            } else if (lowerText.includes('eat') || lowerText.includes('food') || lowerText.includes('hungry')) {
+                mood = 'eating';
+            } else if (lowerText.includes('work') || lowerText.includes('busy')) {
+                mood = 'working';
+            } else if (lowerText.includes('birthday')) {
+                mood = 'birthday';
+            } else if (lowerText.includes('love') || lowerText.includes('girlfriend')) {
+                mood = 'with-girlfriend';
+            } else if (lowerText.includes('awkward')) {
+                mood = 'awkward';
+            }
+
+            console.log(`🎭 Detected mood: ${mood}`);
 
             return {
                 mood: mood,
-                scores: {
-                    compound: intensity.compound,
-                    positive: intensity.pos,
-                    negative: intensity.neg,
-                    neutral: intensity.neu
-                },
-                message: message
+                scores: intensity,
+                confidence: Math.abs(intensity.compound)
             };
         } catch (error) {
-            console.error('Error in mood analysis:', error);
+            console.error('❌ Error analyzing mood:', error);
             return {
                 mood: 'normal',
                 scores: {
                     compound: 0,
                     pos: 0,
                     neg: 0,
-                    neu: 0
-                }
+                    neu: 1
+                },
+                confidence: 0
             };
         }
+    }
+
+    // Helper method to check if text contains any of the words
+    containsAny(text, words) {
+        const lowerText = text.toLowerCase();
+        return words.some(word => lowerText.includes(word));
     }
 }
 
@@ -144,4 +155,5 @@ async function testMoodDetector() {
     }
 }
 
+testMoodDetector();
 testMoodDetector();

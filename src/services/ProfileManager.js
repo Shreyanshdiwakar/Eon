@@ -67,10 +67,33 @@ class ProfileManager {
         }
     }
 
+    normalizeMood(mood) {
+        // Remove extra words and normalize common variations
+        const moodLower = mood.toLowerCase();
+        
+        // Handle variations of "happy"
+        if (moodLower.includes('happy')) return 'happy';
+        if (moodLower.includes('tired')) return 'tired';
+        if (moodLower.includes('confused')) return 'confused';
+        if (moodLower.includes('working')) return 'working';
+        if (moodLower.includes('eating')) return 'eating';
+        if (moodLower.includes('sleeping')) return 'sleeping';
+        if (moodLower.includes('birthday')) return 'birthday';
+        if (moodLower.includes('celebration')) return 'celebration';
+        if (moodLower.includes('awkward')) return 'awkward';
+        if (moodLower.includes('girlfriend')) return 'with-girlfriend';
+        
+        return 'normal';  // default mood
+    }
+
     async updateProfilePicture(userId, mood) {
         try {
             console.log('\n=== Profile Picture Update ===');
-            console.log(`🎭 Requested mood: ${mood}`);
+            console.log(`🎭 Raw mood input: ${mood}`);
+            
+            // Normalize the mood
+            const normalizedMood = this.normalizeMood(mood);
+            console.log(`🎯 Normalized mood: ${normalizedMood}`);
             
             await this.limiter.removeTokens(1);
             console.log('⏳ Rate limit check passed');
@@ -80,11 +103,10 @@ class ProfileManager {
                 await this.initializeInstagram();
             }
 
-            const moodLower = mood.toLowerCase();
-            const imagePath = config.moodImages[moodLower];
+            const imagePath = config.moodImages[normalizedMood];
             
             if (!imagePath) {
-                console.error(`❌ No image found for mood: ${moodLower}`);
+                console.error(`❌ No image found for mood: ${normalizedMood}`);
                 return false;
             }
 
@@ -97,12 +119,16 @@ class ProfileManager {
             console.log('📤 Uploading new profile picture...');
             await this.ig.account.changeProfilePicture(imageBuffer);
             
-            this.currentMood = moodLower;
+            this.currentMood = normalizedMood;
             console.log('🎉 Profile picture updated successfully!');
             console.log('========================\n');
             return true;
         } catch (error) {
             console.error('❌ Profile picture update failed:', error);
+            if (error.name === 'IgNotFoundError') {
+                console.log('⚠️ Instagram API error - retrying initialization...');
+                this.isInstagramInitialized = false;
+            }
             return false;
         }
     }
