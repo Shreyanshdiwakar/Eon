@@ -60,7 +60,7 @@ function createMoodButtons(page = 0) {
     const moods = [
         'happy', 'normal', 'tired', 'confused',
         'awkward', 'working', 'celebration', 'birthday',
-        'with-girlfriend', 'eating', 'sleeping'
+        'with-girlfriend', 'eating', 'eating1', 'sleeping'
     ];
 
     const buttonsPerRow = 4;
@@ -75,10 +75,13 @@ function createMoodButtons(page = 0) {
         const rowButtons = pageButtons.slice(i, i + buttonsPerRow);
 
         rowButtons.forEach(mood => {
+            const label = mood === 'eating1' ? 'Eating 2' : 
+                         mood.charAt(0).toUpperCase() + mood.slice(1).replace('-', ' ');
+            
             row.addComponents(
                 new ButtonBuilder()
                     .setCustomId(`mood_${mood}`)
-                    .setLabel(mood.charAt(0).toUpperCase() + mood.slice(1).replace('-', ' '))
+                    .setLabel(label)
                     .setStyle(ButtonStyle.Primary)
             );
         });
