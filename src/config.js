@@ -8,7 +8,16 @@ module.exports = {
         working: './assets/working.png',
         celebration: './assets/celebration.png',
         birthday: './assets/birthday.png',
-        priyanshi: './assets/with-girlfriend.png'
+        priyanshi: './assets/with-girlfriend.png',
+        eating: './assets/eating.png',
+        eating1: './assets/eating1.png',
+        sleeping: './assets/sleeping.png'
+    },
+    schedule: {
+        sleeping: {
+            start: '23:30', // 11:30 PM
+            end: '07:00'    // 7:00 AM
+        }
     },
     rateLimits: {
         profileUpdates: {

@@ -10,6 +10,9 @@ class MoodDetector {
             priyanshi: ['priyanshi', 'love', 'date', 'romantic'],
             birthday: ['birthday', 'cake', 'anniversary'],
             
+            // Eating keywords (combined for random selection)
+            food: ['eating', 'food', 'hungry', 'lunch', 'dinner', 'breakfast', 'snack', 'meal', 'yummy'],
+            
             // Neutral/Working states
             working: ['work', 'busy', 'coding', 'studying'],
             normal: ['okay', 'fine', 'normal', 'alright'],
@@ -17,7 +20,8 @@ class MoodDetector {
             // Negative states
             confused: ['confused', 'unsure', 'what', 'why', 'how'],
             tired: ['tired', 'exhausted', 'sleepy', 'fatigue'],
-            awkward: ['awkward', 'uncomfortable', 'weird']
+            awkward: ['awkward', 'uncomfortable', 'weird'],
+            sleeping: ['sleep', 'goodnight', 'night', 'bed']
         };
 
         // VADER thresholds
@@ -63,7 +67,33 @@ class MoodDetector {
 
     async getDetailedAnalysis(message) {
         const intensity = vaderSentiment.SentimentIntensityAnalyzer.polarity_scores(message);
-        const mood = await this.analyzeMood(message);
+        let mood = 'normal';
+
+        // Check for specific keywords first
+        for (const [emotion, keywords] of Object.entries(this.emotionMappings)) {
+            if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
+                // Special handling for food-related messages
+                if (emotion === 'food') {
+                    mood = Math.random() < 0.5 ? 'eating' : 'eating1';
+                } else {
+                    mood = emotion;
+                }
+                break;
+            }
+        }
+
+        // If no keywords found, use sentiment analysis
+        const compound = intensity.compound;
+        
+        if (compound >= this.thresholds.high_pos) {
+            return 'happy';
+        } else if (compound <= this.thresholds.high_neg) {
+            return 'tired';
+        } else if (compound <= this.thresholds.low_neg) {
+            return 'confused';
+        } else if (compound >= this.thresholds.low_pos) {
+            return 'normal';
+        }
 
         return {
             mood: mood,
