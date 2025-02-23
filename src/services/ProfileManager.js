@@ -8,6 +8,7 @@ const { FileCookieStore } = require('tough-cookie-file-store');
 
 class ProfileManager {
     constructor() {
+        console.log('🔧 Initializing ProfileManager...');
         this.profilePictures = config.moodImages;
 
         // Separate rate limiters for Discord and Instagram
@@ -24,84 +25,85 @@ class ProfileManager {
         // Initialize Instagram client
         this.ig = new IgApiClient();
 
-        this.rateLimiter = new RateLimiter({
+        this.limiter = new RateLimiter({
             tokensPerInterval: 2,
-            interval: 'minute'
+            interval: "minute"
         });
 
         this.isInstagramInitialized = false;
+        this.currentMood = 'normal';
+        console.log('✅ ProfileManager initialized');
     }
 
     async initializeInstagram() {
+        if (this.isInstagramInitialized) {
+            console.log('ℹ️ Instagram already initialized');
+            return;
+        }
+
         try {
-            // Basic device setup
+            console.log('🔄 Starting Instagram initialization...');
+            console.log(`👤 Attempting login for: ${process.env.IG_USERNAME}`);
+            
             this.ig.state.generateDevice(process.env.IG_USERNAME);
+            console.log('📱 Device generated');
             
-            // Simple cookie store
-            this.ig.state.cookieStore = new FileCookieStore('./cookies.json');
+            await this.ig.simulate.preLoginFlow();
+            console.log('🔄 Pre-login flow completed');
             
-            console.log('Attempting Instagram login for:', process.env.IG_USERNAME);
-            
-            // Direct login without simulation
             const loggedInUser = await this.ig.account.login(process.env.IG_USERNAME, process.env.IG_PASSWORD);
-            console.log('Instagram login successful for:', loggedInUser.username);
+            console.log(`✅ Successfully logged in as: ${loggedInUser.username}`);
             
+            process.nextTick(async () => {
+                await this.ig.simulate.postLoginFlow();
+                console.log('✅ Post-login flow completed');
+            });
+
             this.isInstagramInitialized = true;
-            
-            // Save session
-            await fs.writeFile(
-                './ig_session.json', 
-                JSON.stringify(await this.ig.state.serialize())
-            );
-            
-            return true;
+            console.log('🎉 Instagram initialization complete!');
         } catch (error) {
-            console.error('Instagram login error:', error.message);
-            
-            if (error.message.includes('challenge_required')) {
-                throw new Error('Instagram security check required. Please log in through the website first.');
-            } else if (error.message.includes('bad_password')) {
-                throw new Error('Instagram password is incorrect.');
-            } else if (error.message.includes('login_required')) {
-                throw new Error('Instagram session expired. Please try again.');
-            }
-            
-            throw new Error(`Instagram login failed: ${error.message}`);
+            console.error('❌ Instagram initialization failed:', error);
+            throw error;
         }
     }
 
     async updateProfilePicture(userId, mood) {
         try {
-            const hasToken = await this.rateLimiter.tryRemoveTokens(1);
-            if (!hasToken) {
-                throw new Error('Rate limit exceeded. Please wait a minute.');
-            }
+            console.log('\n=== Profile Picture Update ===');
+            console.log(`🎭 Requested mood: ${mood}`);
+            
+            await this.limiter.removeTokens(1);
+            console.log('⏳ Rate limit check passed');
 
             if (!this.isInstagramInitialized) {
+                console.log('🔄 Instagram not initialized, initializing now...');
                 await this.initializeInstagram();
             }
 
-            const imagePath = this.profilePictures[mood] || this.profilePictures.normal;
-            const absolutePath = path.resolve(process.cwd(), imagePath);
+            const moodLower = mood.toLowerCase();
+            const imagePath = config.moodImages[moodLower];
             
-            try {
-                const imageBuffer = await fs.readFile(absolutePath);
-                await this.ig.account.changeProfilePicture(imageBuffer);
-                return `Successfully updated Instagram profile to ${mood} mood`;
-            } catch (error) {
-                if (error.message.includes('login_required')) {
-                    this.isInstagramInitialized = false;
-                    await this.initializeInstagram();
-                    // Retry once after re-login
-                    const imageBuffer = await fs.readFile(absolutePath);
-                    await this.ig.account.changeProfilePicture(imageBuffer);
-                    return `Successfully updated Instagram profile to ${mood} mood (after re-login)`;
-                }
-                throw error;
+            if (!imagePath) {
+                console.error(`❌ No image found for mood: ${moodLower}`);
+                return false;
             }
+
+            const fullPath = path.join(__dirname, '../../', imagePath);
+            console.log(`📂 Reading image from: ${fullPath}`);
+            
+            const imageBuffer = await fs.readFile(fullPath);
+            console.log('✅ Image file read successfully');
+
+            console.log('📤 Uploading new profile picture...');
+            await this.ig.account.changeProfilePicture(imageBuffer);
+            
+            this.currentMood = moodLower;
+            console.log('🎉 Profile picture updated successfully!');
+            console.log('========================\n');
+            return true;
         } catch (error) {
-            console.error('Profile update error:', error);
-            throw error;
+            console.error('❌ Profile picture update failed:', error);
+            return false;
         }
     }
 

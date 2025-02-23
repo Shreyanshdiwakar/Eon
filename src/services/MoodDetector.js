@@ -66,45 +66,58 @@ class MoodDetector {
     }
 
     async getDetailedAnalysis(message) {
-        const intensity = vaderSentiment.SentimentIntensityAnalyzer.polarity_scores(message);
-        let mood = 'normal';
+        try {
+            const intensity = vaderSentiment.SentimentIntensityAnalyzer.polarity_scores(message);
+            let mood = 'normal';
 
-        // Check for specific keywords first
-        for (const [emotion, keywords] of Object.entries(this.emotionMappings)) {
-            if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
-                // Special handling for food-related messages
-                if (emotion === 'food') {
-                    mood = Math.random() < 0.5 ? 'eating' : 'eating1';
-                } else {
-                    mood = emotion;
+            // Check for specific keywords first
+            for (const [emotion, keywords] of Object.entries(this.emotionMappings)) {
+                if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
+                    // Special handling for food-related messages
+                    if (emotion === 'food') {
+                        mood = Math.random() < 0.5 ? 'eating' : 'eating1';
+                    } else {
+                        mood = emotion;
+                    }
+                    break;
                 }
-                break;
             }
-        }
 
-        // If no keywords found, use sentiment analysis
-        const compound = intensity.compound;
-        
-        if (compound >= this.thresholds.high_pos) {
-            return 'happy';
-        } else if (compound <= this.thresholds.high_neg) {
-            return 'tired';
-        } else if (compound <= this.thresholds.low_neg) {
-            return 'confused';
-        } else if (compound >= this.thresholds.low_pos) {
-            return 'normal';
-        }
+            // If no keywords found, use sentiment analysis
+            const compound = intensity.compound;
+            
+            if (compound >= this.thresholds.high_pos) {
+                return 'happy';
+            } else if (compound <= this.thresholds.high_neg) {
+                return 'tired';
+            } else if (compound <= this.thresholds.low_neg) {
+                return 'confused';
+            } else if (compound >= this.thresholds.low_pos) {
+                return 'normal';
+            }
 
-        return {
-            mood: mood,
-            scores: {
-                compound: intensity.compound,
-                positive: intensity.pos,
-                negative: intensity.neg,
-                neutral: intensity.neu
-            },
-            message: message
-        };
+            return {
+                mood: mood,
+                scores: {
+                    compound: intensity.compound,
+                    positive: intensity.pos,
+                    negative: intensity.neg,
+                    neutral: intensity.neu
+                },
+                message: message
+            };
+        } catch (error) {
+            console.error('Error in mood analysis:', error);
+            return {
+                mood: 'normal',
+                scores: {
+                    compound: 0,
+                    pos: 0,
+                    neg: 0,
+                    neu: 0
+                }
+            };
+        }
     }
 }
 

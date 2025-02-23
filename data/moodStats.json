@@ -1,0 +1,22 @@
+{
+  "totalMoodChanges": 5,
+  "moodCounts": {
+    "so happy": 2,
+    "appy": 1,
+    "so tired": 1,
+    "tired": 1
+  },
+  "dailyStats": {
+    "2025-02-23": {
+      "moodCounts": {
+        "so happy": 2,
+        "appy": 1,
+        "so tired": 1,
+        "tired": 1
+      },
+      "totalChanges": 5
+    }
+  },
+  "lastMood": "tired",
+  "lastMoodTime": "2025-02-23T02:13:05.641Z"
+}

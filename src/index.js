@@ -3,6 +3,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const MoodDetector = require('./services/MoodDetector');
 const ProfileManager = require('./services/ProfileManager');
 const TimeManager = require('./services/TimeManager');
+const StatisticsManager = require('./services/StatisticsManager');
 const config = require('./config');
 
 console.log('Environment check:', {
@@ -26,79 +27,116 @@ const client = new Client({
 
 const moodDetector = new MoodDetector();
 const profileManager = new ProfileManager();
-const timeManager = new TimeManager(client, profileManager);
+const statsManager = new StatisticsManager();
+const timeManager = new TimeManager(client, profileManager, statsManager);
 
 client.once('ready', () => {
-    console.log('Bot is ready!');
+    console.log('\n=== Bot Startup ===');
+    console.log(`✅ Logged in as: ${client.user.tag}`);
+    console.log('📡 Connected to Discord');
+    console.log('⏰ Starting scheduler...');
     timeManager.startScheduler();
+    console.log('🤖 Bot is ready and listening!\n');
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    // Ignore bot messages and DMs
+    if (message.author.bot || !message.guild) return;
 
-    // Check cooldown
-    const lastMessageTime = messageCooldowns.get(message.author.id);
-    const now = Date.now();
-    if (lastMessageTime && now - lastMessageTime < COOLDOWN_DURATION) {
-        return; // Ignore messages during cooldown
-    }
-    messageCooldowns.set(message.author.id, now);
-    
     try {
-        console.log('Processing message:', message.content);
-        
+        console.log('\n=== New Message ===');
+        console.log(`From: ${message.author.username}`);
+        console.log(`Content: "${message.content}"`);
+        console.log('==================\n');
+
+        // Handle stats command
+        if (message.content.toLowerCase() === '!moodstats') {
+            console.log('📊 Processing stats command...');
+            const stats = statsManager.getStats();
+            
+            let response = '📊 **Mood Statistics**\n\n';
+            response += `Total mood changes: ${stats.total}\n`;
+            response += `Changes today: ${stats.today}\n`;
+            response += `Most common mood: ${stats.mostCommon}\n`;
+            
+            message.channel.send(response)
+                .then(() => console.log('✅ Stats response sent successfully'))
+                .catch(err => console.error('❌ Error sending stats:', err));
+            return;
+        }
+
         // Direct mood commands
         if (message.content.toLowerCase().startsWith('i am ')) {
-            const userInput = message.content.toLowerCase().replace('i am ', '').trim();
-            console.log('Detected mood command with input:', userInput);
-            
-            const analysis = await moodDetector.getDetailedAnalysis(message.content);
-            console.log('Mood analysis:', analysis);
-            
-            let response = `I detected your mood as: ${analysis.mood}\n`;
-            response += `Confidence scores: Positive: ${(analysis.scores.positive * 100).toFixed(1)}%, Negative: ${(analysis.scores.negative * 100).toFixed(1)}%`;
+            const moodText = message.content.slice(5).trim().toLowerCase();
+            console.log(`🎯 Direct mood command detected: "${moodText}"`);
             
             try {
-                // Send a single response with both the analysis and the update status
-                const imagePath = await profileManager.updateProfilePicture(message.author.id, analysis.mood);
-                if (imagePath) {
-                    response += `\nUpdated profile picture: ${imagePath}`;
-                }
-                await message.reply(response);
+                console.log('📸 Attempting to update Instagram profile picture...');
+                const updated = await profileManager.updateProfilePicture(null, moodText);
+                
+                const response = updated 
+                    ? `I'm feeling ${moodText} too! Updated my Instagram profile picture! ✨`
+                    : `I understand you're feeling ${moodText}, but I couldn't update my Instagram picture 😕`;
+                
+                await message.channel.send(response);
+                console.log(`✅ Mood response sent: ${response}`);
+                
+                await statsManager.recordMoodChange(moodText, message.author.id);
+                console.log('📝 Mood statistics updated');
             } catch (error) {
-                console.error('Profile update error:', error);
-                response += `\nError updating profile: ${error.message}`;
-                await message.reply(response);
+                console.error('❌ Error in mood command:', error);
+                message.channel.send('Sorry, I had trouble processing that mood change.');
             }
             return;
         }
 
-        // AI-based mood detection for other messages
+        // AI-based mood detection
+        console.log('🤖 Analyzing message sentiment...');
         const analysis = await moodDetector.getDetailedAnalysis(message.content);
-        console.log('Message analysis:', analysis);
-        
-        // Only respond if sentiment is strong enough
-        if (Math.abs(analysis.scores.compound) > 0.2) {
-            let response = `I sense that you're feeling ${analysis.mood}! `;
-            response += `(Confidence: ${(Math.abs(analysis.scores.compound) * 100).toFixed(1)}%)`;
+        console.log('📊 Analysis result:', analysis);
+
+        if (analysis && analysis.mood) {
+            console.log(`🎭 Detected mood: ${analysis.mood}`);
             
             try {
-                const imagePath = await profileManager.updateProfilePicture(message.author.id, analysis.mood);
-                if (imagePath) {
-                    response += `\nUpdated profile picture: ${imagePath}`;
+                console.log('📸 Updating Instagram profile picture...');
+                const updated = await profileManager.updateProfilePicture(null, analysis.mood);
+                
+                let response = `I sense that you're feeling ${analysis.mood}! `;
+                if (updated) {
+                    response += `I've updated my Instagram profile to match your mood! 🌟`;
+                } else {
+                    response += `(Though I couldn't update my Instagram picture right now) 🤔`;
                 }
-                await message.reply(response);
+                
+                await message.channel.send(response);
+                console.log('✅ Response sent:', response);
+                
+                await statsManager.recordMoodChange(analysis.mood, message.author.id);
+                console.log('📝 Mood statistics updated');
             } catch (error) {
-                console.error('Profile update error:', error);
-                response += `\nError updating profile: ${error.message}`;
-                await message.reply(response);
+                console.error('❌ Error processing mood:', error);
+                message.channel.send('I understand your mood but encountered an error updating my picture.');
             }
         }
-        
+
     } catch (error) {
-        console.error('Error processing message:', error.stack);
-        await message.reply('Sorry, I encountered an error processing your mood.');
+        console.error('❌ Critical error:', error);
+        message.channel.send('Sorry, I encountered an error processing your message.')
+            .catch(err => console.error('Failed to send error message:', err));
     }
 });
 
-client.login(process.env.DISCORD_TOKEN); 
+// Error handling
+client.on('error', error => {
+    console.error('❌ Discord client error:', error);
+});
+
+process.on('unhandledRejection', error => {
+    console.error('❌ Unhandled promise rejection:', error);
+});
+
+// Login with error handling
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => console.log('🔑 Login successful'))
+    .catch(error => console.error('❌ Login failed:', error)); 
