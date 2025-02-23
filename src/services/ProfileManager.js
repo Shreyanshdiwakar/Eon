@@ -36,34 +36,32 @@ class ProfileManager {
     }
 
     async initializeInstagram() {
-        if (this.isInstagramInitialized) {
-            console.log('ℹ️ Instagram already initialized');
-            return;
-        }
-
         try {
             console.log('🔄 Starting Instagram initialization...');
-            console.log(`👤 Attempting login for: ${process.env.IG_USERNAME}`);
-            
+            console.log('👤 Attempting login for:', process.env.IG_USERNAME);
+
+            this.ig = new IgApiClient();
             this.ig.state.generateDevice(process.env.IG_USERNAME);
-            console.log('📱 Device generated');
+            
+            // Disable additional API calls that might cause errors
+            this.ig.request.end$.subscribe(() => {});
             
             await this.ig.simulate.preLoginFlow();
-            console.log('🔄 Pre-login flow completed');
+            await this.ig.account.login(process.env.IG_USERNAME, process.env.IG_PASSWORD);
             
-            const loggedInUser = await this.ig.account.login(process.env.IG_USERNAME, process.env.IG_PASSWORD);
-            console.log(`✅ Successfully logged in as: ${loggedInUser.username}`);
-            
-            process.nextTick(async () => {
-                await this.ig.simulate.postLoginFlow();
-                console.log('✅ Post-login flow completed');
-            });
-
-            this.isInstagramInitialized = true;
+            console.log('✅ Successfully logged in as:', process.env.IG_USERNAME);
             console.log('🎉 Instagram initialization complete!');
+            
+            this.isInstagramInitialized = true;
+            
+            // Don't perform post-login flow
+            // process.nextTick(async () => await this.ig.simulate.postLoginFlow());
+            
+            return true;
         } catch (error) {
             console.error('❌ Instagram initialization failed:', error);
-            throw error;
+            this.isInstagramInitialized = false;
+            return false;
         }
     }
 
@@ -91,7 +89,6 @@ class ProfileManager {
             console.log('\n=== Profile Picture Update ===');
             console.log(`🎭 Raw mood input: ${mood}`);
             
-            // Normalize the mood
             const normalizedMood = this.normalizeMood(mood);
             console.log(`🎯 Normalized mood: ${normalizedMood}`);
             
@@ -104,7 +101,6 @@ class ProfileManager {
             }
 
             const imagePath = config.moodImages[normalizedMood];
-            
             if (!imagePath) {
                 console.error(`❌ No image found for mood: ${normalizedMood}`);
                 return false;
@@ -122,13 +118,16 @@ class ProfileManager {
             this.currentMood = normalizedMood;
             console.log('🎉 Profile picture updated successfully!');
             console.log('========================\n');
+            
             return true;
         } catch (error) {
             console.error('❌ Profile picture update failed:', error);
-            if (error.name === 'IgNotFoundError') {
-                console.log('⚠️ Instagram API error - retrying initialization...');
+            
+            if (error.name === 'IgLoginRequiredError') {
+                console.log('⚠️ Instagram login required - resetting initialization');
                 this.isInstagramInitialized = false;
             }
+            
             return false;
         }
     }

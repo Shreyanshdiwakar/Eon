@@ -1,4 +1,5 @@
 const vader = require('vader-sentiment');
+const config = require('../config');
 
 class MoodDetector {
     constructor() {
@@ -31,6 +32,22 @@ class MoodDetector {
             low_pos: 0.1,
             low_neg: -0.1,
             high_neg: -0.5
+        };
+
+        this.moodEmojis = config.moodEmojis;
+        this.workKeywords = ['work', 'working', 'busy', 'studying', 'coding', 'programming'];
+        
+        // Define direct mood keywords
+        this.directMoods = {
+            'working': ['work', 'working', 'busy', 'coding', 'studying'],
+            'sleeping': ['sleep', 'sleeping', 'sleepy', 'tired', 'nap'],
+            'eating': ['eat', 'eating', 'food', 'hungry', 'lunch', 'dinner'],
+            'confused': ['confused', 'unsure', 'puzzled'],
+            'happy': ['happy', 'glad', 'excited', 'joy'],
+            'awkward': ['awkward', 'weird'],
+            'celebration': ['celebration', 'party', 'celebrate'],
+            'birthday': ['birthday', 'bday'],
+            'with-girlfriend': ['girlfriend', 'date', 'dating']
         };
     }
 
@@ -70,57 +87,80 @@ class MoodDetector {
         try {
             console.log(`\n🔍 Analyzing text: "${text}"`);
             
-            // Get VADER sentiment scores
             const intensity = vader.SentimentIntensityAnalyzer.polarity_scores(text);
             console.log('📊 VADER scores:', intensity);
 
-            // Determine mood based on compound score
-            let mood = 'normal';  // default mood
+            let mood = 'normal';
+            let confidence = Math.abs(intensity.compound);
+            let additionalEmojis = [];
             
-            if (intensity.compound >= 0.5) {
-                mood = 'happy';
-            } else if (intensity.compound <= -0.5) {
-                mood = 'tired';  // using tired for negative emotions
-            } else if (intensity.compound > 0.2) {
-                mood = 'celebration';
-            } else if (intensity.compound < -0.2) {
-                mood = 'confused';
-            }
-
-            // Check for specific keywords
+            // Check for direct mood mentions first
             const lowerText = text.toLowerCase();
-            if (lowerText.includes('sleep') || lowerText.includes('tired')) {
-                mood = 'sleeping';
-            } else if (lowerText.includes('eat') || lowerText.includes('food') || lowerText.includes('hungry')) {
-                mood = 'eating';
-            } else if (lowerText.includes('work') || lowerText.includes('busy')) {
-                mood = 'working';
-            } else if (lowerText.includes('birthday')) {
-                mood = 'birthday';
-            } else if (lowerText.includes('love') || lowerText.includes('girlfriend')) {
-                mood = 'with-girlfriend';
-            } else if (lowerText.includes('awkward')) {
-                mood = 'awkward';
+            for (const [moodType, keywords] of Object.entries(this.directMoods)) {
+                if (keywords.some(word => lowerText.includes(word))) {
+                    mood = moodType;
+                    confidence = 0.9;  // High confidence for direct mood mentions
+                    console.log(`🎯 Direct mood match: ${mood} (confidence: ${confidence})`);
+                    break;
+                }
             }
 
-            console.log(`🎭 Detected mood: ${mood}`);
+            // If no direct mood found, use sentiment analysis
+            if (mood === 'normal') {
+                if (intensity.compound >= 0.5) {
+                    mood = 'happy';
+                    additionalEmojis = ['⭐', '✨'];
+                } else if (intensity.compound <= -0.5) {
+                    mood = 'tired';
+                    additionalEmojis = ['💫'];
+                } else if (intensity.compound > 0.2) {
+                    mood = 'celebration';
+                    additionalEmojis = ['🌟'];
+                } else if (intensity.compound < -0.2) {
+                    mood = 'confused';
+                    additionalEmojis = ['❓'];
+                }
+            }
+
+            // Add mood-specific emojis
+            switch (mood) {
+                case 'sleeping':
+                    additionalEmojis = ['💤', '🛏️'];
+                    break;
+                case 'eating':
+                    additionalEmojis = ['🍽️', '🍴'];
+                    break;
+                case 'working':
+                    additionalEmojis = ['💻', '📚'];
+                    break;
+                case 'birthday':
+                    additionalEmojis = ['🎂', '🎈'];
+                    break;
+                case 'with-girlfriend':
+                    additionalEmojis = ['❤️', '💕'];
+                    break;
+                case 'awkward':
+                    additionalEmojis = ['😅', '😳'];
+                    break;
+            }
+
+            console.log(`🎭 Final mood detection: ${mood} (confidence: ${confidence})`);
 
             return {
                 mood: mood,
                 scores: intensity,
-                confidence: Math.abs(intensity.compound)
+                confidence: confidence,
+                mainEmoji: this.moodEmojis[mood],
+                additionalEmojis: additionalEmojis
             };
         } catch (error) {
             console.error('❌ Error analyzing mood:', error);
             return {
                 mood: 'normal',
-                scores: {
-                    compound: 0,
-                    pos: 0,
-                    neg: 0,
-                    neu: 1
-                },
-                confidence: 0
+                scores: { compound: 0, pos: 0, neg: 0, neu: 1 },
+                confidence: 0,
+                mainEmoji: this.moodEmojis['normal'],
+                additionalEmojis: []
             };
         }
     }

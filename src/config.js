@@ -13,6 +13,20 @@ module.exports = {
         'eating1': './assets/eating1.png',
         'sleeping': './assets/sleeping.png'
     },
+    moodEmojis: {
+        'happy': '😊',
+        'normal': '😐',
+        'tired': '😴',
+        'confused': '😕',
+        'awkward': '😅',
+        'working': '💻',
+        'celebration': '🎉',
+        'birthday': '🎂',
+        'with-girlfriend': '❤️',
+        'eating': '🍽️',
+        'eating1': '🍴',
+        'sleeping': '💤'
+    },
     schedule: {
         sleeping: {
             start: '23:30', // 11:30 PM

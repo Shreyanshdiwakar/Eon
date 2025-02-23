@@ -6,6 +6,7 @@ const TimeManager = require('./services/TimeManager');
 const StatisticsManager = require('./services/StatisticsManager');
 const MoodSuggester = require('./services/MoodSuggester');
 const config = require('./config');
+const JournalManager = require('./services/JournalManager');
 
 console.log('Environment check:', {
     hasDiscordToken: !!process.env.DISCORD_TOKEN,
@@ -31,6 +32,7 @@ const profileManager = new ProfileManager();
 const statsManager = new StatisticsManager();
 const timeManager = new TimeManager(client, profileManager, statsManager);
 const moodSuggester = new MoodSuggester();
+const journalManager = new JournalManager(client, statsManager);
 
 client.once('ready', () => {
     console.log('\n=== Bot Startup ===');
@@ -56,7 +58,11 @@ function createMainMenu() {
             new ButtonBuilder()
                 .setCustomId('menu_suggest')
                 .setLabel('🤔 I\'m Unsure')
-                .setStyle(ButtonStyle.Success)
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('menu_journal')
+                .setLabel('📔 Daily Journal')
+                .setStyle(ButtonStyle.Secondary)
         );
     return [row];
 }
@@ -211,41 +217,77 @@ client.on('messageCreate', async (message) => {
             return;
         }
 
-        // AI-based mood detection
+        // AI-based mood detection and reactions
         console.log('🤖 Analyzing message sentiment...');
         const analysis = await moodDetector.getDetailedAnalysis(message.content);
         console.log('📊 Analysis result:', analysis);
 
         if (analysis && analysis.mood) {
-            // Only respond if confidence is high enough
-            if (analysis.confidence > 0.2) {
-                console.log(`🎭 Detected mood: ${analysis.mood} (Confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
+            // Add reactions based on mood
+            try {
+                // Add main mood emoji
+                await message.react(analysis.mainEmoji);
                 
-                try {
-                    console.log('📸 Updating Instagram profile picture...');
-                    const updated = await profileManager.updateProfilePicture(null, analysis.mood);
-                    
-                    let response = `I sense that you're feeling ${analysis.mood}! `;
-                    response += `(${(analysis.confidence * 100).toFixed(1)}% confident) `;
-                    
-                    if (updated) {
-                        response += `\nI've updated my Instagram profile to match your mood! 🌟`;
-                    } else {
-                        response += `\n(Though I couldn't update my Instagram picture right now) 🤔`;
-                    }
-                    
-                    await message.channel.send(response);
-                    console.log('✅ Response sent:', response);
-                    
-                    await statsManager.recordMoodChange(analysis.mood, message.author.id);
-                    console.log('📝 Mood statistics updated');
-                } catch (error) {
-                    console.error('❌ Error processing mood:', error);
-                    message.channel.send('I understand your mood but encountered an error updating my picture.');
+                // Add additional contextual emojis (up to 2)
+                for (const emoji of analysis.additionalEmojis.slice(0, 2)) {
+                    await message.react(emoji);
                 }
-            } else {
-                console.log(`⏭️ Skipping low confidence mood: ${analysis.confidence}`);
+                
+                console.log('✅ Added mood reactions:', [analysis.mainEmoji, ...analysis.additionalEmojis]);
+
+                // Only respond with mood update if confidence is high enough
+                if (analysis.confidence > 0.2) {
+                    console.log(`🎭 Detected mood: ${analysis.mood} (Confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
+                    
+                    try {
+                        console.log('📸 Updating Instagram profile picture...');
+                        const updated = await profileManager.updateProfilePicture(null, analysis.mood);
+                        
+                        let response = `I sense that you're feeling ${analysis.mood}! `;
+                        response += `(${(analysis.confidence * 100).toFixed(1)}% confident) `;
+                        
+                        if (updated) {
+                            response += `\nI've updated my Instagram profile to match your mood! ${analysis.mainEmoji}`;
+                        } else {
+                            response += `\n(Though I couldn't update my Instagram picture right now) 🤔`;
+                        }
+                        
+                        await message.channel.send(response);
+                        console.log('✅ Response sent:', response);
+                        
+                        await statsManager.recordMoodChange(analysis.mood, message.author.id);
+                        console.log('📝 Mood statistics updated');
+                    } catch (error) {
+                        console.error('❌ Error processing mood:', error);
+                        message.channel.send('I understand your mood but encountered an error updating my picture.');
+                    }
+                } else {
+                    console.log(`⏭️ Skipping low confidence mood: ${analysis.confidence}`);
+                }
+            } catch (error) {
+                console.error('❌ Error adding reactions:', error);
             }
+        }
+
+        // Handle journal commands
+        if (message.content.toLowerCase() === '!journal') {
+            console.log('📔 Journal requested');
+            const embed = await journalManager.generateDailySummary(message.author.id);
+            
+            if (embed) {
+                await message.author.send({ embeds: [embed] });
+                await message.reply('I\'ve sent your mood journal to your DMs! 📬');
+            } else {
+                await message.reply('Sorry, I couldn\'t generate your journal right now 😕');
+            }
+            return;
+        }
+
+        if (message.content.toLowerCase() === '!subscribe') {
+            console.log('📮 Journal subscription requested');
+            journalManager.scheduleDaily(message.author.id);
+            await message.reply('You\'re now subscribed to daily mood journals! Check your DMs at 8 PM daily 📔');
+            return;
         }
 
     } catch (error) {
@@ -261,23 +303,54 @@ client.on('interactionCreate', async (interaction) => {
 
     try {
         const [action, value] = interaction.customId.split('_');
+        console.log(`🔘 Button pressed: ${action}_${value}`);
 
         if (action === 'menu') {
             if (value === 'suggest') {
                 console.log('🤔 Mood suggestion requested from menu');
                 const suggestions = await moodSuggester.suggestMood(interaction);
                 
-                let response = '**Based on your patterns:**\n';
-                if (statsManager.stats.lastMood) {
-                    response += `Your last mood was: ${statsManager.stats.lastMood}\n`;
+                const rows = [];
+                const buttonRow = new ActionRowBuilder();
+                
+                // Create buttons for each suggestion
+                suggestions.forEach(mood => {
+                    buttonRow.addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`mood_${mood}`)
+                            .setLabel(mood.charAt(0).toUpperCase() + mood.slice(1))
+                            .setStyle(ButtonStyle.Primary)
+                    );
+                });
+                
+                rows.push(buttonRow);
+
+                // Add back button
+                const backRow = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('menu_back')
+                            .setLabel('↩️ Back to Menu')
+                            .setStyle(ButtonStyle.Danger)
+                    );
+                rows.push(backRow);
+
+                let response = 'Based on your patterns:\n';
+                const stats = statsManager.getStats();
+                if (stats.lastMood) {
+                    response += `Your last mood was: ${stats.lastMood}\n`;
                 }
                 response += 'Here are some suggestions:';
-                
-                const rows = createSuggestionButtons(suggestions);
-                
+
                 await interaction.update({
                     content: response,
-                    components: [...rows, createBackRow()]
+                    components: rows
+                });
+            } else if (value === 'back') {
+                console.log('↩️ Returning to main menu');
+                await interaction.update({
+                    content: '**Choose an option:**',
+                    components: createMainMenu()
                 });
             } else if (value === 'moods') {
                 console.log('🎭 Mood submenu requested');
@@ -308,24 +381,33 @@ client.on('interactionCreate', async (interaction) => {
                     content: response,
                     components: [row]
                 });
-            } else if (value === 'back') {
-                console.log('↩️ Returning to main menu');
-                const rows = createMainMenu();
-                await interaction.update({
-                    content: '**Choose an option:**',
-                    components: rows
-                });
+            } else if (value === 'journal') {
+                console.log('📔 Journal requested via button');
+                const embed = await journalManager.generateDailySummary(interaction.user.id);
+                
+                if (embed) {
+                    await interaction.user.send({ embeds: [embed] });
+                    await interaction.update({
+                        content: 'I\'ve sent your mood journal to your DMs! 📬\nWant to receive daily updates? Use `!subscribe`',
+                        components: [createBackRow()]
+                    });
+                } else {
+                    await interaction.update({
+                        content: 'Sorry, I couldn\'t generate your journal right now 😕',
+                        components: [createBackRow()]
+                    });
+                }
             }
         } else if (action === 'mood') {
-            console.log(`🎭 Mood selected via button: ${value}`);
+            console.log(`🎭 Mood selected: ${value}`);
             await interaction.deferUpdate();
 
             try {
-                const updated = await profileManager.updateProfilePicture(null, value);
+                const updated = await profileManager.updateProfilePicture(interaction.user.id, value);
                 const response = updated 
                     ? `Updated my mood to: ${value} ✨`
                     : `Sorry, I couldn't update my mood to ${value} 😕`;
-                
+
                 // Add back button
                 const row = new ActionRowBuilder()
                     .addComponents(
@@ -350,63 +432,59 @@ client.on('interactionCreate', async (interaction) => {
                     components: []
                 });
             }
-        } else if (action === 'prev' || action === 'next') {
-            const currentPage = parseInt(value);
-            const newPage = action === 'prev' ? currentPage - 1 : currentPage + 1;
-            const rows = createMoodButtons(newPage);
-            
-            await interaction.update({
-                components: rows
-            });
         }
     } catch (error) {
         console.error('❌ Error handling button interaction:', error);
-        await interaction.reply({
-            content: 'Sorry, I encountered an error processing your selection.',
-            ephemeral: true
-        });
+        try {
+            await interaction.reply({
+                content: 'Sorry, I encountered an error processing your selection.',
+                ephemeral: true
+            });
+        } catch (replyError) {
+            try {
+                await interaction.followUp({
+                    content: 'Sorry, I encountered an error processing your selection.',
+                    ephemeral: true
+                });
+            } catch (followUpError) {
+                console.error('❌ Failed to send error message:', followUpError);
+            }
+        }
     }
 });
 
-// Helper function to create a back button row
 function createBackRow() {
-    return new ActionRowBuilder()
+    const row = new ActionRowBuilder()
         .addComponents(
             new ButtonBuilder()
                 .setCustomId('menu_back')
                 .setLabel('↩️ Back to Menu')
                 .setStyle(ButtonStyle.Danger)
         );
+    return row;
 }
 
-// Update the suggestion buttons creation
 function createSuggestionButtons(suggestions) {
     const rows = [];
-    const row = new ActionRowBuilder();
-    
-    suggestions.forEach((mood, index) => {
-        row.addComponents(
-            new ButtonBuilder()
-                .setCustomId(`mood_${mood}`)
-                .setLabel(`${index === 0 ? '✨ ' : ''}${mood.charAt(0).toUpperCase() + mood.slice(1)}`)
-                .setStyle(index === 0 ? ButtonStyle.Primary : ButtonStyle.Secondary)
-        );
-    });
-    
-    rows.push(row);
+    const buttonPerRow = 4;
+
+    for (let i = 0; i < suggestions.length; i += buttonPerRow) {
+        const row = new ActionRowBuilder();
+        const rowButtons = suggestions.slice(i, i + buttonPerRow);
+
+        rowButtons.forEach(suggestion => {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`suggestion_${suggestion}`)
+                    .setLabel(suggestion)
+                    .setStyle(ButtonStyle.Primary)
+            );
+        });
+
+        rows.push(row);
+    }
+
     return rows;
 }
 
-// Error handling
-client.on('error', error => {
-    console.error('❌ Discord client error:', error);
-});
-
-process.on('unhandledRejection', error => {
-    console.error('❌ Unhandled promise rejection:', error);
-});
-
-// Login with error handling
-client.login(process.env.DISCORD_TOKEN)
-    .then(() => console.log('🔑 Login successful'))
-    .catch(error => console.error('❌ Login failed:', error)); 
+client.login(process.env.DISCORD_TOKEN);

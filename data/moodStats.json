@@ -1,13 +1,14 @@
 {
-  "totalMoodChanges": 9,
+  "totalMoodChanges": 12,
   "moodCounts": {
     "so happy": 3,
     "appy": 1,
     "so tired": 1,
     "tired": 1,
     "feeling so happy": 1,
-    "working": 1,
-    "happy": 1
+    "working": 3,
+    "happy": 1,
+    "sleeping": 1
   },
   "dailyStats": {
     "2025-02-23": {
@@ -17,12 +18,13 @@
         "so tired": 1,
         "tired": 1,
         "feeling so happy": 1,
-        "working": 1,
-        "happy": 1
+        "working": 3,
+        "happy": 1,
+        "sleeping": 1
       },
-      "totalChanges": 9
+      "totalChanges": 12
     }
   },
-  "lastMood": "happy",
-  "lastMoodTime": "2025-02-23T02:43:59.732Z"
+  "lastMood": "working",
+  "lastMoodTime": "2025-02-23T03:08:51.553Z"
 }
