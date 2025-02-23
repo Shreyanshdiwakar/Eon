@@ -5,6 +5,10 @@ server.get('/', (req, res) => {
   res.send('Bot is running!');
 });
 
-server.listen(3000, () => {
-  console.log('Server is ready.');
-}); 
+function keepAlive() {
+  server.listen(3000, () => {
+    console.log('Web server running on port 3000');
+  });
+}
+
+module.exports = keepAlive; 
