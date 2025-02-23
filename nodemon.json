@@ -1,0 +1,5 @@
+{
+  "ignore": ["node_modules/*", "assets/*"],
+  "watch": ["src/"],
+  "ext": "js,json,env"
+} 
