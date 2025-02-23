@@ -1,5 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
+const GraphGenerator = require('./GraphGenerator');
 
 class StatisticsManager {
     constructor() {
@@ -11,6 +12,7 @@ class StatisticsManager {
             lastMoodTime: null
         };
         this.statsFile = path.join(__dirname, '../../data/moodStats.json');
+        this.graphGenerator = new GraphGenerator();
         this.loadStats();
     }
 
@@ -92,6 +94,24 @@ class StatisticsManager {
         } catch (error) {
             console.error('Error getting user mood history:', error);
             return [];
+        }
+    }
+
+    async generateGraphs() {
+        try {
+            console.log('📈 Generating mood graphs...');
+            const history = await this.getMoodHistory();
+            
+            const trendGraph = await this.graphGenerator.generateDailyTrendGraph(history);
+            const distributionGraph = await this.graphGenerator.generateMoodDistributionGraph(history);
+            
+            return {
+                trend: trendGraph,
+                distribution: distributionGraph
+            };
+        } catch (error) {
+            console.error('❌ Error generating graphs:', error);
+            return null;
         }
     }
 }

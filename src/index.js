@@ -7,6 +7,7 @@ const StatisticsManager = require('./services/StatisticsManager');
 const MoodSuggester = require('./services/MoodSuggester');
 const config = require('./config');
 const JournalManager = require('./services/JournalManager');
+const MoodPredictor = require('./services/MoodPredictor');
 
 console.log('Environment check:', {
     hasDiscordToken: !!process.env.DISCORD_TOKEN,
@@ -33,6 +34,7 @@ const statsManager = new StatisticsManager();
 const timeManager = new TimeManager(client, profileManager, statsManager);
 const moodSuggester = new MoodSuggester();
 const journalManager = new JournalManager(client, statsManager);
+const moodPredictor = new MoodPredictor(statsManager);
 
 client.once('ready', () => {
     console.log('\n=== Bot Startup ===');
@@ -62,6 +64,10 @@ function createMainMenu() {
             new ButtonBuilder()
                 .setCustomId('menu_journal')
                 .setLabel('📔 Daily Journal')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('menu_predict')
+                .setLabel('🔮 Predict Mood')
                 .setStyle(ButtonStyle.Secondary)
         );
     return [row];
@@ -290,6 +296,39 @@ client.on('messageCreate', async (message) => {
             return;
         }
 
+        // Handle prediction command
+        if (message.content.toLowerCase() === '!predict') {
+            console.log('🔮 Mood prediction requested');
+            const predictionEmbed = await moodPredictor.predictTomorrowsMood();
+            
+            if (predictionEmbed) {
+                await message.reply({ embeds: [predictionEmbed] });
+                console.log('✅ Prediction sent successfully');
+            } else {
+                await message.reply('Sorry, I couldn\'t generate a prediction right now 😕');
+                console.log('❌ Failed to generate prediction');
+            }
+            return;
+        }
+
+        // Add graph command handling
+        if (message.content.toLowerCase() === '!graphs') {
+            console.log('📊 Generating mood graphs...');
+            const graphs = await statsManager.generateGraphs();
+            
+            if (graphs) {
+                await message.reply({
+                    content: '📈 Here are your mood trends:',
+                    files: [graphs.trend, graphs.distribution]
+                });
+                console.log('✅ Graphs sent successfully');
+            } else {
+                await message.reply('Sorry, I couldn\'t generate the graphs right now 😕');
+                console.log('❌ Failed to generate graphs');
+            }
+            return;
+        }
+
     } catch (error) {
         console.error('❌ Critical error:', error);
         message.channel.send('Sorry, I encountered an error processing your message.')
@@ -362,25 +401,25 @@ client.on('interactionCreate', async (interaction) => {
             } else if (value === 'stats') {
                 console.log('📊 Processing stats request');
                 const stats = statsManager.getStats();
+                const graphs = await statsManager.generateGraphs();
                 
                 let response = '📊 **Mood Statistics**\n\n';
                 response += `Total mood changes: ${stats.total}\n`;
                 response += `Changes today: ${stats.today}\n`;
                 response += `Most common mood: ${stats.mostCommon}\n`;
                 
-                // Add back button
-                const row = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('menu_back')
-                            .setLabel('↩️ Back to Menu')
-                            .setStyle(ButtonStyle.Secondary)
-                    );
-
-                await interaction.update({
-                    content: response,
-                    components: [row]
-                });
+                if (graphs) {
+                    await interaction.update({
+                        content: response,
+                        files: [graphs.trend, graphs.distribution],
+                        components: [createBackRow()]
+                    });
+                } else {
+                    await interaction.update({
+                        content: response + '\n(Could not generate graphs at this time)',
+                        components: [createBackRow()]
+                    });
+                }
             } else if (value === 'journal') {
                 console.log('📔 Journal requested via button');
                 const embed = await journalManager.generateDailySummary(interaction.user.id);
@@ -394,6 +433,22 @@ client.on('interactionCreate', async (interaction) => {
                 } else {
                     await interaction.update({
                         content: 'Sorry, I couldn\'t generate your journal right now 😕',
+                        components: [createBackRow()]
+                    });
+                }
+            } else if (value === 'predict') {
+                console.log('🔮 Prediction requested via button');
+                const predictionEmbed = await moodPredictor.predictTomorrowsMood();
+                
+                if (predictionEmbed) {
+                    await interaction.update({
+                        content: 'Here\'s my prediction for tomorrow:',
+                        embeds: [predictionEmbed],
+                        components: [createBackRow()]
+                    });
+                } else {
+                    await interaction.update({
+                        content: 'Sorry, I couldn\'t generate a prediction right now 😕',
                         components: [createBackRow()]
                     });
                 }
