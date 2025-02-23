@@ -1,7 +1,9 @@
 {
   "name": "discord-mood-bot",
+  "version": "1.0.0",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "git pull origin main && node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -9,6 +11,7 @@
     "@huggingface/inference": "^3.3.6",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "instagram-private-api": "^1.46.1",
     "limiter": "^3.0.0",
     "node-cron": "^3.0.3",
