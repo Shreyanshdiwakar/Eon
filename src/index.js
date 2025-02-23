@@ -8,9 +8,6 @@ const MoodSuggester = require('./services/MoodSuggester');
 const config = require('./config');
 const JournalManager = require('./services/JournalManager');
 const MoodPredictor = require('./services/MoodPredictor');
-const express = require('express');
-const server = express();
-const keepAlive = require('./server.js');
 
 console.log('Environment check:', {
     hasDiscordToken: !!process.env.DISCORD_TOKEN,
@@ -544,8 +541,5 @@ function createSuggestionButtons(suggestions) {
 
     return rows;
 }
-
-// Add this before client.login
-keepAlive();
 
 client.login(process.env.DISCORD_TOKEN);

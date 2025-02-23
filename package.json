@@ -11,7 +11,6 @@
     "@huggingface/inference": "^3.3.6",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
     "instagram-private-api": "^1.46.1",
     "limiter": "^3.0.0",
     "node-cron": "^3.0.3",
