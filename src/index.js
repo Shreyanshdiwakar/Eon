@@ -4,6 +4,7 @@ const MoodDetector = require('./services/MoodDetector');
 const ProfileManager = require('./services/ProfileManager');
 const TimeManager = require('./services/TimeManager');
 const StatisticsManager = require('./services/StatisticsManager');
+const MoodSuggester = require('./services/MoodSuggester');
 const config = require('./config');
 
 console.log('Environment check:', {
@@ -29,6 +30,7 @@ const moodDetector = new MoodDetector();
 const profileManager = new ProfileManager();
 const statsManager = new StatisticsManager();
 const timeManager = new TimeManager(client, profileManager, statsManager);
+const moodSuggester = new MoodSuggester();
 
 client.once('ready', () => {
     console.log('\n=== Bot Startup ===');
@@ -50,7 +52,11 @@ function createMainMenu() {
             new ButtonBuilder()
                 .setCustomId('menu_stats')
                 .setLabel('📊 Mood Stats')
-                .setStyle(ButtonStyle.Secondary)
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('menu_suggest')
+                .setLabel('🤔 I\'m Unsure')
+                .setStyle(ButtonStyle.Success)
         );
     return [row];
 }
@@ -257,7 +263,23 @@ client.on('interactionCreate', async (interaction) => {
         const [action, value] = interaction.customId.split('_');
 
         if (action === 'menu') {
-            if (value === 'moods') {
+            if (value === 'suggest') {
+                console.log('🤔 Mood suggestion requested from menu');
+                const suggestions = await moodSuggester.suggestMood(interaction);
+                
+                let response = '**Based on your patterns:**\n';
+                if (statsManager.stats.lastMood) {
+                    response += `Your last mood was: ${statsManager.stats.lastMood}\n`;
+                }
+                response += 'Here are some suggestions:';
+                
+                const rows = createSuggestionButtons(suggestions);
+                
+                await interaction.update({
+                    content: response,
+                    components: [...rows, createBackRow()]
+                });
+            } else if (value === 'moods') {
                 console.log('🎭 Mood submenu requested');
                 const rows = createMoodButtons();
                 await interaction.update({
@@ -345,6 +367,35 @@ client.on('interactionCreate', async (interaction) => {
         });
     }
 });
+
+// Helper function to create a back button row
+function createBackRow() {
+    return new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('menu_back')
+                .setLabel('↩️ Back to Menu')
+                .setStyle(ButtonStyle.Danger)
+        );
+}
+
+// Update the suggestion buttons creation
+function createSuggestionButtons(suggestions) {
+    const rows = [];
+    const row = new ActionRowBuilder();
+    
+    suggestions.forEach((mood, index) => {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`mood_${mood}`)
+                .setLabel(`${index === 0 ? '✨ ' : ''}${mood.charAt(0).toUpperCase() + mood.slice(1)}`)
+                .setStyle(index === 0 ? ButtonStyle.Primary : ButtonStyle.Secondary)
+        );
+    });
+    
+    rows.push(row);
+    return rows;
+}
 
 // Error handling
 client.on('error', error => {

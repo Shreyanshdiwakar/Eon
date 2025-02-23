@@ -80,6 +80,20 @@ class StatisticsManager {
             lastMoodTime: this.stats.lastMoodTime
         };
     }
+
+    async getUserMoodHistory(userId, limit = 10) {
+        try {
+            // This is a simple in-memory implementation
+            // You might want to use a database in production
+            return this.moodHistory
+                .filter(entry => entry.userId === userId)
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .slice(0, limit);
+        } catch (error) {
+            console.error('Error getting user mood history:', error);
+            return [];
+        }
+    }
 }
 
 module.exports = StatisticsManager; 
