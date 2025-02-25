@@ -99,20 +99,104 @@ class StatisticsManager {
 
     async generateGraphs() {
         try {
-            console.log('📈 Generating mood graphs...');
-            const history = await this.getMoodHistory();
-            
-            const trendGraph = await this.graphGenerator.generateDailyTrendGraph(history);
-            const distributionGraph = await this.graphGenerator.generateMoodDistributionGraph(history);
-            
-            return {
-                trend: trendGraph,
-                distribution: distributionGraph
-            };
+            const QuickChart = require('quickchart-js');
+
+            // Get mood data
+            const moodData = this.getMoodData();
+
+            // Create trend chart
+            const trendChart = new QuickChart();
+            trendChart
+                .setWidth(800)
+                .setHeight(400)
+                .setConfig({
+                    type: 'line',
+                    data: {
+                        labels: moodData.dates,
+                        datasets: [{
+                            label: 'Mood Changes',
+                            data: moodData.counts,
+                            fill: false,
+                            borderColor: 'rgb(75, 192, 192)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Mood Changes Over Time'
+                            }
+                        }
+                    }
+                });
+
+            // Create distribution chart
+            const distributionChart = new QuickChart();
+            distributionChart
+                .setWidth(800)
+                .setHeight(400)
+                .setConfig({
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(moodData.distribution),
+                        datasets: [{
+                            label: 'Mood Distribution',
+                            data: Object.values(moodData.distribution),
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Mood Distribution'
+                            }
+                        }
+                    }
+                });
+
+            // Get URLs for the charts
+            const trendUrl = trendChart.getUrl();
+            const distributionUrl = distributionChart.getUrl();
+
+            return { trend: trendUrl, distribution: distributionUrl };
         } catch (error) {
-            console.error('❌ Error generating graphs:', error);
+            console.error('Error generating graphs:', error);
             return null;
         }
+    }
+
+    getMoodData() {
+        // Get data from your storage
+        const moodHistory = this.loadMoodHistory();
+        
+        // Process data for graphs
+        const dates = [];
+        const counts = [];
+        const distribution = {};
+
+        // Last 7 days
+        const now = new Date();
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - i);
+            dates.push(date.toLocaleDateString());
+            counts.push(0);
+        }
+
+        // Count moods
+        moodHistory.forEach(entry => {
+            const date = new Date(entry.timestamp).toLocaleDateString();
+            const dateIndex = dates.indexOf(date);
+            if (dateIndex !== -1) {
+                counts[dateIndex]++;
+            }
+
+            distribution[entry.mood] = (distribution[entry.mood] || 0) + 1;
+        });
+
+        return { dates, counts, distribution };
     }
 }
 
