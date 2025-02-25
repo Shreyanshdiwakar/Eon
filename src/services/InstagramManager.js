@@ -5,11 +5,15 @@ const path = require('path');
 class InstagramManager {
     constructor() {
         this.ig = new IgApiClient();
-        this.lastUpdate = 0;
-        this.minTimeBetweenUpdates = 3600000; // 1 hour minimum between updates
-        this.maxUpdatesPerDay = 8; // Maximum 8 updates per day
-        this.updateCount = 0;
-        this.lastDayReset = new Date().setHours(0,0,0,0);
+        this.limits = {
+            maxUpdatesPerDay: 8,
+            minTimeBetweenUpdates: 3600000, // 1 hour in milliseconds
+            randomDelay: {
+                min: 60000,  // 1 minute
+                max: 180000  // 3 minutes
+            }
+        };
+        this.updateHistory = new Map();
     }
 
     async login() {
@@ -24,31 +28,112 @@ class InstagramManager {
         }
     }
 
-    async updateProfilePicture(mood) {
+    async canUpdate(userId) {
+        const now = Date.now();
+        const userHistory = this.updateHistory.get(userId) || {
+            lastUpdate: 0,
+            todayCount: 0,
+            lastDayChecked: new Date().toDateString()
+        };
+
+        // Reset daily count if it's a new day
+        if (userHistory.lastDayChecked !== new Date().toDateString()) {
+            userHistory.todayCount = 0;
+            userHistory.lastDayChecked = new Date().toDateString();
+            console.log(`🔄 Reset daily count for user ${userId}`);
+        }
+
+        // Check daily limit
+        if (userHistory.todayCount >= this.limits.maxUpdatesPerDay) {
+            console.log(`⚠️ Daily limit reached for user ${userId}: ${userHistory.todayCount}/${this.limits.maxUpdatesPerDay}`);
+            return {
+                allowed: false,
+                reason: `Daily limit reached (${userHistory.todayCount}/${this.limits.maxUpdatesPerDay})`,
+                nextUpdate: 'Tomorrow',
+                limits: {
+                    daily: `${userHistory.todayCount}/${this.limits.maxUpdatesPerDay}`,
+                    nextReset: new Date(new Date().setHours(24, 0, 0, 0)).toLocaleString()
+                }
+            };
+        }
+
+        // Check time between updates
+        const timeSinceLastUpdate = now - userHistory.lastUpdate;
+        if (timeSinceLastUpdate < this.limits.minTimeBetweenUpdates) {
+            const waitTime = Math.ceil((this.limits.minTimeBetweenUpdates - timeSinceLastUpdate) / 60000);
+            console.log(`⏳ Cooldown active for user ${userId}: ${waitTime} minutes remaining`);
+            return {
+                allowed: false,
+                reason: 'Cooldown active',
+                nextUpdate: `Wait ${waitTime} minutes`,
+                limits: {
+                    cooldown: `${waitTime} minutes remaining`,
+                    daily: `${userHistory.todayCount}/${this.limits.maxUpdatesPerDay}`
+                }
+            };
+        }
+
+        return { 
+            allowed: true,
+            limits: {
+                daily: `${userHistory.todayCount}/${this.limits.maxUpdatesPerDay}`,
+                lastUpdate: userHistory.lastUpdate ? new Date(userHistory.lastUpdate).toLocaleString() : 'Never'
+            }
+        };
+    }
+
+    async getLimitStatus(userId) {
+        const now = Date.now();
+        const userHistory = this.updateHistory.get(userId) || {
+            lastUpdate: 0,
+            todayCount: 0,
+            lastDayChecked: new Date().toDateString()
+        };
+
+        const timeSinceLastUpdate = now - userHistory.lastUpdate;
+        const cooldownRemaining = Math.max(0, Math.ceil((this.limits.minTimeBetweenUpdates - timeSinceLastUpdate) / 60000));
+
+        return {
+            daily: `${userHistory.todayCount}/${this.limits.maxUpdatesPerDay}`,
+            cooldown: cooldownRemaining > 0 ? `${cooldownRemaining} minutes` : 'Ready',
+            lastUpdate: userHistory.lastUpdate ? new Date(userHistory.lastUpdate).toLocaleString() : 'Never',
+            nextReset: new Date(new Date().setHours(24, 0, 0, 0)).toLocaleString()
+        };
+    }
+
+    async updateProfilePicture(userId, mood) {
         try {
-            // Check if we need to reset daily counter
-            const today = new Date().setHours(0,0,0,0);
-            if (today > this.lastDayReset) {
-                this.updateCount = 0;
-                this.lastDayReset = today;
+            const canUpdateCheck = await this.canUpdate(userId);
+            if (!canUpdateCheck.allowed) {
+                throw new Error(`${canUpdateCheck.reason}\n\nLimits:\n- Daily: ${canUpdateCheck.limits.daily}\n- Next update: ${canUpdateCheck.nextUpdate}`);
             }
 
-            // Check update limits
-            const now = Date.now();
-            if (now - this.lastUpdate < this.minTimeBetweenUpdates) {
-                console.log('⏳ Skipping update - Need to wait longer between updates');
-                return false;
-            }
-
-            if (this.updateCount >= this.maxUpdatesPerDay) {
-                console.log('⚠️ Daily update limit reached');
-                return false;
-            }
-
-            // Add random delay between 1-3 minutes
-            const delay = Math.floor(Math.random() * 120000) + 60000;
-            console.log(`⏳ Adding delay of ${delay/1000} seconds before update`);
+            // Add random delay
+            const delay = Math.floor(
+                Math.random() * 
+                (this.limits.randomDelay.max - this.limits.randomDelay.min) + 
+                this.limits.randomDelay.min
+            );
+            console.log(`⏱️ Adding random delay of ${delay/1000}s for user ${userId}`);
             await new Promise(resolve => setTimeout(resolve, delay));
+
+            // Update user history
+            const userHistory = this.updateHistory.get(userId) || {
+                lastUpdate: 0,
+                todayCount: 0,
+                lastDayChecked: new Date().toDateString()
+            };
+            userHistory.lastUpdate = Date.now();
+            userHistory.todayCount++;
+            this.updateHistory.set(userId, userHistory);
+
+            // Log the update
+            console.log(`📸 Profile update for user ${userId}:`, {
+                mood,
+                delay: `${delay/1000}s`,
+                todayCount: userHistory.todayCount,
+                nextUpdateAllowed: new Date(Date.now() + this.limits.minTimeBetweenUpdates).toLocaleString()
+            });
 
             // Get image path
             const imagePath = path.join(__dirname, '..', '..', 'assets', `${mood}.png`);
@@ -65,21 +150,20 @@ class InstagramManager {
                 picture: imageBuffer
             });
 
-            // Update counters
-            this.lastUpdate = now;
-            this.updateCount++;
-
-            console.log(`✅ Profile picture updated to ${mood} (Update ${this.updateCount}/${this.maxUpdatesPerDay} today)`);
-            return true;
+            console.log(`✅ Profile picture updated to ${mood} (Update ${userHistory.todayCount}/${this.limits.maxUpdatesPerDay} today)`);
+            return {
+                success: true,
+                limits: await this.getLimitStatus(userId)
+            };
 
         } catch (error) {
             if (error.message.includes('login_required')) {
                 console.log('🔄 Session expired, attempting to re-login');
                 await this.login();
-                return this.updateProfilePicture(mood); // Retry once after re-login
+                return this.updateProfilePicture(userId, mood); // Retry once after re-login
             }
-            console.error('❌ Error updating Instagram profile picture:', error.message);
-            return false;
+            console.error('❌ Profile update error:', error);
+            throw error;
         }
     }
 }
