@@ -1,53 +1,39 @@
-const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('help')
-        .setDescription('Shows all available commands')
-        .addStringOption(option =>
-            option.setName('command')
-                .setDescription('Get detailed help for a specific command')
-                .setRequired(false)
-                .addChoices(
-                    { name: 'mood', value: 'mood' },
-                    { name: 'stats', value: 'stats' },
-                    { name: 'limits', value: 'limits' },
-                    { name: 'journal', value: 'journal' },
-                    { name: 'predict', value: 'predict' }
-                )),
-
-    async execute(interaction) {
-        const specificCommand = interaction.options.getString('command');
+    name: 'help',
+    description: 'Shows all available commands',
+    async execute(message, args) {
+        const specificCommand = args[0];
 
         if (specificCommand) {
-            return await showCommandHelp(interaction, specificCommand);
+            return await showCommandHelp(message, specificCommand);
         }
 
         const embed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle('🤖 Eon Bot Commands')
-            .setDescription('Here are all available commands. Select a command to see detailed help.')
+            .setDescription('Here are all available commands. Use `!help <command>` for detailed help.')
             .addFields(
                 {
                     name: '😊 Mood Management',
                     value: 
-                        '`/mood` - Change your mood and Instagram profile\n' +
-                        '`/stats` - View your mood statistics and graphs\n' +
-                        '`/limits` - Check your mood update limits'
+                        '`!mood` - Change your mood and Instagram profile\n' +
+                        '`!stats` - View your mood statistics and graphs\n' +
+                        '`!limits` - Check your mood update limits'
                 },
                 {
                     name: '📝 Journal & Predictions',
                     value: 
-                        '`/journal` - Write or view your daily mood journal\n' +
-                        '`/predict` - Get mood predictions based on your history'
+                        '`!journal` - Write or view your daily mood journal\n' +
+                        '`!predict` - Get mood predictions based on your history'
                 },
                 {
                     name: '❓ Help & Info',
-                    value: '`/help [command]` - Show this help or get detailed command help'
+                    value: '`!help [command]` - Show this help or get detailed command help'
                 }
             )
-            .setFooter({ text: 'Tip: Use /help <command> for detailed information about a specific command' });
+            .setFooter({ text: 'Tip: Use !help <command> for detailed information about a specific command' });
 
         const row = new ActionRowBuilder()
             .addComponents(
@@ -69,20 +55,20 @@ module.exports = {
                     .setStyle(ButtonStyle.Primary)
             );
 
-        await interaction.reply({ embeds: [embed], components: [row] });
+        await message.reply({ embeds: [embed], components: [row] });
     },
 };
 
-async function showCommandHelp(interaction, command) {
+async function showCommandHelp(message, command) {
     const helpData = {
         mood: {
             title: '😊 Mood Command Help',
             description: 'Change your mood and update your Instagram profile picture',
-            usage: '`/mood`',
+            usage: '`!mood`',
             fields: [
                 {
                     name: '📝 How to Use',
-                    value: '1. Type `/mood`\n2. Click the "Change Mood" button\n3. Select your new mood from the menu'
+                    value: '1. Type `!mood`\n2. Click the "Change Mood" button\n3. Select your new mood from the menu'
                 },
                 {
                     name: '🎭 Available Moods',
@@ -97,7 +83,7 @@ async function showCommandHelp(interaction, command) {
         stats: {
             title: '📊 Stats Command Help',
             description: 'View your mood statistics and trends',
-            usage: '`/stats`',
+            usage: '`!stats`',
             fields: [
                 {
                     name: '📝 Information Shown',
@@ -108,7 +94,7 @@ async function showCommandHelp(interaction, command) {
         limits: {
             title: '⚡ Limits Command Help',
             description: 'Check your current mood update limits and cooldowns',
-            usage: '`/limits`',
+            usage: '`!limits`',
             fields: [
                 {
                     name: '📝 Information Shown',
@@ -119,7 +105,7 @@ async function showCommandHelp(interaction, command) {
         journal: {
             title: '📝 Journal Command Help',
             description: 'Write and view your daily mood journal',
-            usage: '`/journal`',
+            usage: '`!journal`',
             fields: [
                 {
                     name: '📝 Features',
@@ -130,7 +116,7 @@ async function showCommandHelp(interaction, command) {
         predict: {
             title: '🔮 Predict Command Help',
             description: 'Get mood predictions based on your history',
-            usage: '`/predict`',
+            usage: '`!predict`',
             fields: [
                 {
                     name: '📝 Features',
@@ -142,8 +128,8 @@ async function showCommandHelp(interaction, command) {
 
     const data = helpData[command];
     if (!data) {
-        return await interaction.reply({ 
-            content: 'Command not found. Use `/help` to see all available commands.',
+        return await message.reply({ 
+            content: 'Command not found. Use `!help` to see all available commands.',
             ephemeral: true 
         });
     }
@@ -165,5 +151,5 @@ async function showCommandHelp(interaction, command) {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+    await message.reply({ embeds: [embed], components: [row] });
 } 

@@ -142,197 +142,22 @@ function createMoodButtons(page = 0) {
     return rows;
 }
 
-client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.guild) return;
+client.on('messageCreate', async message => {
+    if (message.author.bot) return;
+    if (!message.content.startsWith('!')) return;
+
+    const args = message.content.slice(1).trim().split(/ +/);
+    const commandName = args.shift().toLowerCase();
+
+    const command = client.commands.get(commandName);
+
+    if (!command) return;
 
     try {
-        // Handle menu command
-        if (message.mentions.has(client.user)) {
-            console.log('📋 Main menu requested');
-            const rows = createMainMenu();
-            await message.reply({
-                content: '**Choose an option:**',
-                components: rows
-            });
-            return;
-        }
-
-        console.log('\n=== New Message ===');
-        console.log(`From: ${message.author.username}`);
-        console.log(`Content: "${message.content}"`);
-        console.log('==================\n');
-
-        // Handle stats command
-        if (message.content.toLowerCase() === '!moodstats') {
-            console.log('📊 Processing stats command...');
-            const stats = statsManager.getStats();
-            
-            let response = '📊 **Mood Statistics**\n\n';
-            response += `Total mood changes: ${stats.total}\n`;
-            response += `Changes today: ${stats.today}\n`;
-            response += `Most common mood: ${stats.mostCommon}\n`;
-            
-            message.channel.send(response)
-                .then(() => console.log('✅ Stats response sent successfully'))
-                .catch(err => console.error('❌ Error sending stats:', err));
-            return;
-        }
-
-        // Handle default/normal profile picture command
-        if (message.content.toLowerCase() === '!default' || message.content.toLowerCase() === '!normal') {
-            console.log('🔄 Default profile picture command received');
-            try {
-                const updated = await profileManager.updateProfilePicture(null, 'normal');
-                const response = updated 
-                    ? 'Reset to my default profile picture! 🔄'
-                    : 'Sorry, I had trouble setting my default picture 😕';
-                
-                await message.channel.send(response);
-                if (updated) {
-                    await statsManager.recordMoodChange('normal', message.author.id);
-                }
-            } catch (error) {
-                console.error('❌ Error setting default picture:', error);
-                await message.channel.send('Sorry, I encountered an error setting my default picture.');
-            }
-            return;
-        }
-
-        // Direct mood commands
-        if (message.content.toLowerCase().startsWith('i am ')) {
-            const moodText = message.content.slice(5).trim().toLowerCase();
-            console.log(`🎯 Direct mood command detected: "${moodText}"`);
-            
-            try {
-                console.log('📸 Attempting to update Instagram profile picture...');
-                const updated = await profileManager.updateProfilePicture(null, moodText);
-                
-                const response = updated 
-                    ? `I'm feeling ${moodText} too! Updated my Instagram profile picture! ✨`
-                    : `I understand you're feeling ${moodText}, but I couldn't update my Instagram picture 😕`;
-                
-                await message.channel.send(response);
-                console.log(`✅ Mood response sent: ${response}`);
-                
-                await statsManager.recordMoodChange(moodText, message.author.id);
-                console.log('📝 Mood statistics updated');
-            } catch (error) {
-                console.error('❌ Error in mood command:', error);
-                message.channel.send('Sorry, I had trouble processing that mood change.');
-            }
-            return;
-        }
-
-        // AI-based mood detection and reactions
-        console.log('🤖 Analyzing message sentiment...');
-        const analysis = await moodDetector.getDetailedAnalysis(message.content);
-        console.log('📊 Analysis result:', analysis);
-
-        if (analysis && analysis.mood) {
-            // Add reactions based on mood
-            try {
-                // Add main mood emoji
-                await message.react(analysis.mainEmoji);
-                
-                // Add additional contextual emojis (up to 2)
-                for (const emoji of analysis.additionalEmojis.slice(0, 2)) {
-                    await message.react(emoji);
-                }
-                
-                console.log('✅ Added mood reactions:', [analysis.mainEmoji, ...analysis.additionalEmojis]);
-
-                // Only respond with mood update if confidence is high enough
-                if (analysis.confidence > 0.2) {
-                    console.log(`🎭 Detected mood: ${analysis.mood} (Confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
-                    
-                    try {
-                        console.log('📸 Updating Instagram profile picture...');
-                        const updated = await profileManager.updateProfilePicture(null, analysis.mood);
-                        
-                        let response = `I sense that you're feeling ${analysis.mood}! `;
-                        response += `(${(analysis.confidence * 100).toFixed(1)}% confident) `;
-                        
-                        if (updated) {
-                            response += `\nI've updated my Instagram profile to match your mood! ${analysis.mainEmoji}`;
-                        } else {
-                            response += `\n(Though I couldn't update my Instagram picture right now) 🤔`;
-                        }
-                        
-                        await message.channel.send(response);
-                        console.log('✅ Response sent:', response);
-                        
-                        await statsManager.recordMoodChange(analysis.mood, message.author.id);
-                        console.log('📝 Mood statistics updated');
-                    } catch (error) {
-                        console.error('❌ Error processing mood:', error);
-                        message.channel.send('I understand your mood but encountered an error updating my picture.');
-                    }
-                } else {
-                    console.log(`⏭️ Skipping low confidence mood: ${analysis.confidence}`);
-                }
-            } catch (error) {
-                console.error('❌ Error adding reactions:', error);
-            }
-        }
-
-        // Handle journal commands
-        if (message.content.toLowerCase() === '!journal') {
-            console.log('📔 Journal requested');
-            const embed = await journalManager.generateDailySummary(message.author.id);
-            
-            if (embed) {
-                await message.author.send({ embeds: [embed] });
-                await message.reply('I\'ve sent your mood journal to your DMs! 📬');
-            } else {
-                await message.reply('Sorry, I couldn\'t generate your journal right now 😕');
-            }
-            return;
-        }
-
-        if (message.content.toLowerCase() === '!subscribe') {
-            console.log('📮 Journal subscription requested');
-            journalManager.scheduleDaily(message.author.id);
-            await message.reply('You\'re now subscribed to daily mood journals! Check your DMs at 8 PM daily 📔');
-            return;
-        }
-
-        // Handle prediction command
-        if (message.content.toLowerCase() === '!predict') {
-            console.log('🔮 Mood prediction requested');
-            const predictionEmbed = await moodPredictor.predictTomorrowsMood();
-            
-            if (predictionEmbed) {
-                await message.reply({ embeds: [predictionEmbed] });
-                console.log('✅ Prediction sent successfully');
-            } else {
-                await message.reply('Sorry, I couldn\'t generate a prediction right now 😕');
-                console.log('❌ Failed to generate prediction');
-            }
-            return;
-        }
-
-        // Add graph command handling
-        if (message.content.toLowerCase() === '!graphs') {
-            console.log('📊 Generating mood graphs...');
-            const graphs = await statsManager.generateGraphs();
-            
-            if (graphs) {
-                await message.reply({
-                    content: '📈 Here are your mood trends:',
-                    files: [graphs.trend, graphs.distribution]
-                });
-                console.log('✅ Graphs sent successfully');
-            } else {
-                await message.reply('Sorry, I couldn\'t generate the graphs right now 😕');
-                console.log('❌ Failed to generate graphs');
-            }
-            return;
-        }
-
+        await command.execute(message, args);
     } catch (error) {
-        console.error('❌ Critical error:', error);
-        message.channel.send('Sorry, I encountered an error processing your message.')
-            .catch(err => console.error('Failed to send error message:', err));
+        console.error(error);
+        await message.reply({ content: 'There was an error executing that command!', ephemeral: true });
     }
 });
 
