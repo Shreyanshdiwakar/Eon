@@ -344,6 +344,19 @@ client.on('interactionCreate', async (interaction) => {
         const [action, value] = interaction.customId.split('_');
         console.log(`🔘 Button pressed: ${action}_${value}`);
 
+        // Add this section to handle next/prev buttons
+        if (action === 'next' || action === 'prev') {
+            const currentPage = parseInt(value);
+            const newPage = action === 'next' ? currentPage + 1 : currentPage - 1;
+            const rows = createMoodButtons(newPage);
+            
+            await interaction.update({
+                content: '**Choose a mood:**',
+                components: rows
+            });
+            return;
+        }
+
         if (action === 'menu') {
             if (value === 'suggest') {
                 console.log('🤔 Mood suggestion requested from menu');
