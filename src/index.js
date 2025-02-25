@@ -29,14 +29,20 @@ const client = new Client({
     ]
 });
 
-// Add this: Initialize commands collection
-client.commands = new Map();
+// Change Map to Collection
+client.commands = new Collection();
 
-// Add this: Load commands
+// Load commands
 const commandFiles = fs.readdirSync('./src/commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
-    const command = require(`./commands/${file}`);
-    client.commands.set(command.name, command);
+    try {
+        const command = require(`./commands/${file}`);
+        // Add debug logging
+        console.log(`Loading command: ${command.name}`);
+        client.commands.set(command.name, command);
+    } catch (error) {
+        console.error(`Error loading command ${file}:`, error);
+    }
 }
 
 const moodDetector = new MoodDetector();
@@ -157,13 +163,21 @@ function createMoodButtons(page = 0) {
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
     
-    // Check for prefix commands
+    // Add debug logging
+    console.log('Message received:', message.content);
+    
     if (message.content.startsWith('!')) {
         const args = message.content.slice(1).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
 
+        console.log('Command attempted:', commandName);
+        console.log('Available commands:', Array.from(client.commands.keys()));
+
         const command = client.commands.get(commandName);
-        if (!command) return;
+        if (!command) {
+            console.log('Command not found:', commandName);
+            return;
+        }
 
         try {
             console.log(`📝 Executing command: ${commandName}`);
