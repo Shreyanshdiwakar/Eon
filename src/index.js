@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, Collection } = require('discord.js');
 const MoodDetector = require('./services/MoodDetector');
 const ProfileManager = require('./services/ProfileManager');
 const TimeManager = require('./services/TimeManager');
@@ -8,6 +8,7 @@ const MoodSuggester = require('./services/MoodSuggester');
 const config = require('./config');
 const JournalManager = require('./services/JournalManager');
 const MoodPredictor = require('./services/MoodPredictor');
+const fs = require('fs');
 
 console.log('Environment check:', {
     hasDiscordToken: !!process.env.DISCORD_TOKEN,
@@ -27,6 +28,16 @@ const client = new Client({
         GatewayIntentBits.GuildMembers
     ]
 });
+
+// Add this: Initialize commands collection
+client.commands = new Map();
+
+// Add this: Load commands
+const commandFiles = fs.readdirSync('./src/commands').filter(file => file.endsWith('.js'));
+for (const file of commandFiles) {
+    const command = require(`./commands/${file}`);
+    client.commands.set(command.name, command);
+}
 
 const moodDetector = new MoodDetector();
 const profileManager = new ProfileManager();
@@ -142,22 +153,25 @@ function createMoodButtons(page = 0) {
     return rows;
 }
 
+// Update message handler
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
-    if (!message.content.startsWith('!')) return;
+    
+    // Check for prefix commands
+    if (message.content.startsWith('!')) {
+        const args = message.content.slice(1).trim().split(/ +/);
+        const commandName = args.shift().toLowerCase();
 
-    const args = message.content.slice(1).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
+        const command = client.commands.get(commandName);
+        if (!command) return;
 
-    const command = client.commands.get(commandName);
-
-    if (!command) return;
-
-    try {
-        await command.execute(message, args);
-    } catch (error) {
-        console.error(error);
-        await message.reply({ content: 'There was an error executing that command!', ephemeral: true });
+        try {
+            console.log(`📝 Executing command: ${commandName}`);
+            await command.execute(message, args);
+        } catch (error) {
+            console.error('❌ Command execution error:', error);
+            await message.reply('There was an error executing that command!');
+        }
     }
 });
 
