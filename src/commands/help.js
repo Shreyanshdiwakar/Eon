@@ -29,7 +29,7 @@ module.exports = {
             )
             .setFooter({ text: 'Click the buttons below for detailed command help' });
 
-        const row = new ActionRowBuilder()
+        const row1 = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId('help_mood')
@@ -42,18 +42,26 @@ module.exports = {
                 new ButtonBuilder()
                     .setCustomId('help_limits')
                     .setLabel('Limits')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('help_journal')
-                    .setLabel('Journal')
                     .setStyle(ButtonStyle.Primary)
             );
 
-        if (message.reply) {
-            await message.reply({ embeds: [embed], components: [row] });
-        } else {
-            await message.channel.send({ embeds: [embed], components: [row] });
-        }
+        const row2 = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('help_journal')
+                    .setLabel('Journal')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('help_predict')
+                    .setLabel('Predict')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('help_notsure')
+                    .setLabel('Not Sure?')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+        await message.reply({ embeds: [embed], components: [row1, row2] });
     },
 
     async handleButton(interaction) {
@@ -69,9 +77,10 @@ module.exports = {
                         .setTitle('😊 Mood Command Help')
                         .setDescription('Change your mood and update your Instagram profile picture')
                         .addFields(
-                            { name: '📝 Usage', value: '`!mood`' },
+                            { name: '📝 Usage', value: '`!mood` or just express your mood in chat' },
                             { name: '🎭 Available Moods', value: '• Normal\n• Happy\n• Working\n• Tired\n• Sleeping\n• Eating\n• Confused\n• Celebration\n• Birthday\n• With Girlfriend\n• Awkward' },
-                            { name: '⚠️ Limitations', value: '• Maximum 8 updates per day\n• 1 hour cooldown between updates\n• Random delay of 1-3 minutes' }
+                            { name: '⚠️ Limitations', value: '• Maximum 8 updates per day\n• 1 hour cooldown between updates\n• Random delay of 1-3 minutes' },
+                            { name: '💡 Natural Language', value: 'You can also just chat normally!\nExample: "I\'m so happy today!" will update your mood to happy' }
                         );
                     break;
 
@@ -85,23 +94,25 @@ module.exports = {
                         );
                     break;
 
-                case 'help_limits':
+                case 'help_predict':
                     embed
-                        .setTitle('⚡ Limits Command Help')
-                        .setDescription('Check your current mood update limits and cooldowns')
+                        .setTitle('🔮 Predict Command Help')
+                        .setDescription('Get AI predictions about your future moods')
                         .addFields(
-                            { name: '📝 Usage', value: '`!limits`' },
-                            { name: '📊 Information Shown', value: '• Daily updates used/remaining\n• Cooldown status\n• Last update time\n• Next daily reset time' }
+                            { name: '📝 Usage', value: '`!predict`' },
+                            { name: '✨ Features', value: '• Predict your next likely mood\n• See mood patterns\n• Get personalized suggestions\n• AI-powered analysis' }
                         );
                     break;
 
-                case 'help_journal':
+                case 'help_notsure':
                     embed
-                        .setTitle('📝 Journal Command Help')
-                        .setDescription('Write and view your daily mood journal')
+                        .setTitle('🤔 Not Sure What to Do?')
+                        .setDescription('Here are some suggestions to get started:')
                         .addFields(
-                            { name: '📝 Usage', value: '`!journal`' },
-                            { name: '✨ Features', value: '• Write daily mood entries\n• View past entries\n• Track mood patterns\n• Add personal notes' }
+                            { name: '1️⃣ Express Yourself', value: 'Just chat normally! The bot will detect your mood.' },
+                            { name: '2️⃣ Check Your Stats', value: 'Use `!stats` to see your mood patterns' },
+                            { name: '3️⃣ Get Predictions', value: 'Try `!predict` to see what mood might come next' },
+                            { name: '4️⃣ Write in Journal', value: 'Use `!journal` to keep track of your thoughts' }
                         );
                     break;
 
@@ -110,8 +121,7 @@ module.exports = {
                     return await this.execute(interaction);
             }
 
-            // Add back button to all detailed help pages
-            const row = new ActionRowBuilder()
+            const backRow = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
                         .setCustomId('help_back')
@@ -119,7 +129,7 @@ module.exports = {
                         .setStyle(ButtonStyle.Secondary)
                 );
 
-            await interaction.update({ embeds: [embed], components: [row] });
+            await interaction.update({ embeds: [embed], components: [backRow] });
         } catch (error) {
             console.error('Help button error:', error);
             await interaction.reply({ 
