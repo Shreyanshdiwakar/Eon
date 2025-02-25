@@ -4,16 +4,10 @@ module.exports = {
     name: 'help',
     description: 'Shows all available commands',
     async execute(message, args) {
-        const specificCommand = args[0];
-
-        if (specificCommand) {
-            return await showCommandHelp(message, specificCommand);
-        }
-
         const embed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle('🤖 Eon Bot Commands')
-            .setDescription('Here are all available commands. Use `!help <command>` for detailed help.')
+            .setDescription('Here are all available commands. Click the buttons below for detailed help.')
             .addFields(
                 {
                     name: '😊 Mood Management',
@@ -33,7 +27,7 @@ module.exports = {
                     value: '`!help [command]` - Show this help or get detailed command help'
                 }
             )
-            .setFooter({ text: 'Tip: Use !help <command> for detailed information about a specific command' });
+            .setFooter({ text: 'Click the buttons below for detailed command help' });
 
         const row = new ActionRowBuilder()
             .addComponents(
@@ -55,17 +49,21 @@ module.exports = {
                     .setStyle(ButtonStyle.Primary)
             );
 
-        await message.reply({ embeds: [embed], components: [row] });
+        if (message.reply) {
+            await message.reply({ embeds: [embed], components: [row] });
+        } else {
+            await message.channel.send({ embeds: [embed], components: [row] });
+        }
     },
 
-    // Add button interaction handler
     async handleButton(interaction) {
         try {
-            const buttonId = interaction.customId;
-            let embed = new EmbedBuilder()
+            console.log('Handling button:', interaction.customId);
+            
+            const embed = new EmbedBuilder()
                 .setColor('#0099ff');
 
-            switch (buttonId) {
+            switch (interaction.customId) {
                 case 'help_mood':
                     embed
                         .setTitle('😊 Mood Command Help')
@@ -122,11 +120,10 @@ module.exports = {
                 );
 
             await interaction.update({ embeds: [embed], components: [row] });
-
         } catch (error) {
-            console.error('Error handling help button:', error);
+            console.error('Help button error:', error);
             await interaction.reply({ 
-                content: 'There was an error processing your request.',
+                content: 'There was an error showing the help information.',
                 ephemeral: true 
             });
         }

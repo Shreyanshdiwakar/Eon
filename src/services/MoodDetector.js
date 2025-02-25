@@ -1,4 +1,4 @@
-const axios = require('axios');
+const vader = require('vader-sentiment');
 const config = require('../config');
 
 class MoodDetector {

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, Collection, Events } = require('discord.js');
 const MoodDetector = require('./services/MoodDetector');
 const ProfileManager = require('./services/ProfileManager');
 const TimeManager = require('./services/TimeManager');
@@ -207,176 +207,40 @@ client.on('messageCreate', async message => {
     }
 });
 
-// Handle button interactions
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isButton()) return;
-
+// Update the interaction handler
+client.on(Events.InteractionCreate, async interaction => {
     try {
-        const [command, action] = interaction.customId.split('_');
-        
-        if (command === 'help') {
-            const helpCommand = client.commands.get('help');
-            await helpCommand.handleButton(interaction);
-        } else if (action === 'next' || action === 'prev') {
-            const currentPage = parseInt(value);
-            const newPage = action === 'next' ? currentPage + 1 : currentPage - 1;
-            const rows = createMoodButtons(newPage);
+        // Handle button interactions
+        if (interaction.isButton()) {
+            console.log('Button clicked:', interaction.customId);
             
-            await interaction.update({
-                content: '**Choose a mood:**',
-                components: rows
-            });
-            return;
-        } else if (action === 'menu') {
-            if (value === 'suggest') {
-                console.log('🤔 Mood suggestion requested from menu');
-                const suggestions = await moodSuggester.suggestMood(interaction);
-                
-                const rows = [];
-                const buttonRow = new ActionRowBuilder();
-                
-                // Create buttons for each suggestion
-                suggestions.forEach(mood => {
-                    buttonRow.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`mood_${mood}`)
-                            .setLabel(mood.charAt(0).toUpperCase() + mood.slice(1))
-                            .setStyle(ButtonStyle.Primary)
-                    );
-                });
-                
-                rows.push(buttonRow);
-
-                // Add back button
-                const backRow = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('menu_back')
-                            .setLabel('↩️ Back to Menu')
-                            .setStyle(ButtonStyle.Danger)
-                    );
-                rows.push(backRow);
-
-                let response = 'Based on your patterns:\n';
-                const stats = statsManager.getStats();
-                if (stats.lastMood) {
-                    response += `Your last mood was: ${stats.lastMood}\n`;
-                }
-                response += 'Here are some suggestions:';
-
-                await interaction.update({
-                    content: response,
-                    components: rows
-                });
-            } else if (value === 'back') {
-                console.log('↩️ Returning to main menu');
-                await interaction.update({
-                    content: '**Choose an option:**',
-                    components: createMainMenu()
-                });
-            } else if (value === 'moods') {
-                console.log('🎭 Mood submenu requested');
-                const rows = createMoodButtons();
-                await interaction.update({
-                    content: '**Choose a mood:**',
-                    components: rows
-                });
-            } else if (value === 'stats') {
-                console.log('📊 Processing stats request');
-                const stats = statsManager.getStats();
-                const graphs = await statsManager.generateGraphs();
-                
-                let response = '📊 **Mood Statistics**\n\n';
-                response += `Total mood changes: ${stats.total}\n`;
-                response += `Changes today: ${stats.today}\n`;
-                response += `Most common mood: ${stats.mostCommon}\n`;
-                
-                if (graphs) {
-                    await interaction.update({
-                        content: response,
-                        files: [graphs.trend, graphs.distribution],
-                        components: [createBackRow()]
-                    });
-                } else {
-                    await interaction.update({
-                        content: response + '\n(Could not generate graphs at this time)',
-                        components: [createBackRow()]
-                    });
-                }
-            } else if (value === 'journal') {
-                console.log('📔 Journal requested via button');
-                const embed = await journalManager.generateDailySummary(interaction.user.id);
-                
-                if (embed) {
-                    await interaction.user.send({ embeds: [embed] });
-                    await interaction.update({
-                        content: 'I\'ve sent your mood journal to your DMs! 📬\nWant to receive daily updates? Use `!subscribe`',
-                        components: [createBackRow()]
-                    });
-                } else {
-                    await interaction.update({
-                        content: 'Sorry, I couldn\'t generate your journal right now 😕',
-                        components: [createBackRow()]
-                    });
-                }
-            } else if (value === 'predict') {
-                console.log('🔮 Prediction requested via button');
-                const predictionEmbed = await moodPredictor.predictTomorrowsMood();
-                
-                if (predictionEmbed) {
-                    await interaction.update({
-                        content: 'Here\'s my prediction for tomorrow:',
-                        embeds: [predictionEmbed],
-                        components: [createBackRow()]
-                    });
-                } else {
-                    await interaction.update({
-                        content: 'Sorry, I couldn\'t generate a prediction right now 😕',
-                        components: [createBackRow()]
-                    });
+            if (interaction.customId.startsWith('help_')) {
+                const helpCommand = client.commands.get('help');
+                if (helpCommand) {
+                    await helpCommand.handleButton(interaction);
                 }
             }
-        } else if (action === 'mood') {
-            console.log(`🎭 Mood selected: ${value}`);
-            await interaction.deferUpdate();
-
-            try {
-                const updated = await profileManager.updateProfilePicture(interaction.user.id, value);
-                const response = updated 
-                    ? `Updated my mood to: ${value} ✨`
-                    : `Sorry, I couldn't update my mood to ${value} 😕`;
-
-                // Add back button
-                const row = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('menu_back')
-                            .setLabel('↩️ Back to Menu')
-                            .setStyle(ButtonStyle.Secondary)
-                    );
-
-                await interaction.editReply({
-                    content: response,
-                    components: [row]
-                });
-
-                if (updated) {
-                    await statsManager.recordMoodChange(value, interaction.user.id);
-                }
-            } catch (error) {
-                console.error('❌ Error updating mood:', error);
-                await interaction.editReply({
-                    content: 'Sorry, I encountered an error updating my mood.',
-                    components: []
-                });
+        }
+        
+        // Handle slash commands
+        if (interaction.isChatInputCommand()) {
+            const command = client.commands.get(interaction.commandName);
+            if (command) {
+                await command.execute(interaction);
             }
         }
     } catch (error) {
-        console.error('Error handling button interaction:', error);
-        await interaction.reply({ 
+        console.error('Interaction error:', error);
+        const errorMessage = { 
             content: 'There was an error processing your request.',
             ephemeral: true 
-        });
+        };
+        
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp(errorMessage);
+        } else {
+            await interaction.reply(errorMessage);
+        }
     }
 });
 
