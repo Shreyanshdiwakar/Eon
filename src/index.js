@@ -9,6 +9,7 @@ const config = require('./config');
 const JournalManager = require('./services/JournalManager');
 const MoodPredictor = require('./services/MoodPredictor');
 const fs = require('fs');
+const InstagramManager = require('./services/InstagramManager');
 
 console.log('Environment check:', {
     hasDiscordToken: !!process.env.DISCORD_TOKEN,
@@ -163,9 +164,7 @@ function createMoodButtons(page = 0) {
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
     
-    // Add debug logging
-    console.log('Message received:', message.content);
-    
+    // Handle commands
     if (message.content.startsWith('!')) {
         const args = message.content.slice(1).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
@@ -185,6 +184,25 @@ client.on('messageCreate', async message => {
         } catch (error) {
             console.error('❌ Command execution error:', error);
             await message.reply('There was an error executing that command!');
+        }
+    } else {
+        try {
+            // Detect mood from message
+            const detectedMood = await moodDetector.detectMood(message.content);
+            
+            if (detectedMood) {
+                // Get the InstagramManager instance
+                const igManager = new InstagramManager();
+                
+                // Update the profile picture
+                await igManager.updateProfilePicture(message.author.id, detectedMood);
+                
+                // Send a subtle confirmation with the detected mood
+                await message.react('👍');
+                console.log(`Updated profile picture for ${message.author.username} to ${detectedMood} mood`);
+            }
+        } catch (error) {
+            console.error('Error in mood detection:', error);
         }
     }
 });
