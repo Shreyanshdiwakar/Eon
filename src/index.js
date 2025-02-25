@@ -208,15 +208,16 @@ client.on('messageCreate', async message => {
 });
 
 // Handle button interactions
-client.on('interactionCreate', async (interaction) => {
+client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
     try {
-        const [action, value] = interaction.customId.split('_');
-        console.log(`🔘 Button pressed: ${action}_${value}`);
-
-        // Add this section to handle next/prev buttons
-        if (action === 'next' || action === 'prev') {
+        const [command, action] = interaction.customId.split('_');
+        
+        if (command === 'help') {
+            const helpCommand = client.commands.get('help');
+            await helpCommand.handleButton(interaction);
+        } else if (action === 'next' || action === 'prev') {
             const currentPage = parseInt(value);
             const newPage = action === 'next' ? currentPage + 1 : currentPage - 1;
             const rows = createMoodButtons(newPage);
@@ -226,9 +227,7 @@ client.on('interactionCreate', async (interaction) => {
                 components: rows
             });
             return;
-        }
-
-        if (action === 'menu') {
+        } else if (action === 'menu') {
             if (value === 'suggest') {
                 console.log('🤔 Mood suggestion requested from menu');
                 const suggestions = await moodSuggester.suggestMood(interaction);
@@ -373,22 +372,11 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
     } catch (error) {
-        console.error('❌ Error handling button interaction:', error);
-        try {
-            await interaction.reply({
-                content: 'Sorry, I encountered an error processing your selection.',
-                ephemeral: true
-            });
-        } catch (replyError) {
-            try {
-                await interaction.followUp({
-                    content: 'Sorry, I encountered an error processing your selection.',
-                    ephemeral: true
-                });
-            } catch (followUpError) {
-                console.error('❌ Failed to send error message:', followUpError);
-            }
-        }
+        console.error('Error handling button interaction:', error);
+        await interaction.reply({ 
+            content: 'There was an error processing your request.',
+            ephemeral: true 
+        });
     }
 });
 

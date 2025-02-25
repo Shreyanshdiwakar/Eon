@@ -57,6 +57,80 @@ module.exports = {
 
         await message.reply({ embeds: [embed], components: [row] });
     },
+
+    // Add button interaction handler
+    async handleButton(interaction) {
+        try {
+            const buttonId = interaction.customId;
+            let embed = new EmbedBuilder()
+                .setColor('#0099ff');
+
+            switch (buttonId) {
+                case 'help_mood':
+                    embed
+                        .setTitle('😊 Mood Command Help')
+                        .setDescription('Change your mood and update your Instagram profile picture')
+                        .addFields(
+                            { name: '📝 Usage', value: '`!mood`' },
+                            { name: '🎭 Available Moods', value: '• Normal\n• Happy\n• Working\n• Tired\n• Sleeping\n• Eating\n• Confused\n• Celebration\n• Birthday\n• With Girlfriend\n• Awkward' },
+                            { name: '⚠️ Limitations', value: '• Maximum 8 updates per day\n• 1 hour cooldown between updates\n• Random delay of 1-3 minutes' }
+                        );
+                    break;
+
+                case 'help_stats':
+                    embed
+                        .setTitle('📊 Stats Command Help')
+                        .setDescription('View your mood statistics and trends')
+                        .addFields(
+                            { name: '📝 Usage', value: '`!stats`' },
+                            { name: '📊 Information Shown', value: '• Total mood changes\n• Changes today\n• Most common mood\n• Mood trend graph\n• Mood distribution chart' }
+                        );
+                    break;
+
+                case 'help_limits':
+                    embed
+                        .setTitle('⚡ Limits Command Help')
+                        .setDescription('Check your current mood update limits and cooldowns')
+                        .addFields(
+                            { name: '📝 Usage', value: '`!limits`' },
+                            { name: '📊 Information Shown', value: '• Daily updates used/remaining\n• Cooldown status\n• Last update time\n• Next daily reset time' }
+                        );
+                    break;
+
+                case 'help_journal':
+                    embed
+                        .setTitle('📝 Journal Command Help')
+                        .setDescription('Write and view your daily mood journal')
+                        .addFields(
+                            { name: '📝 Usage', value: '`!journal`' },
+                            { name: '✨ Features', value: '• Write daily mood entries\n• View past entries\n• Track mood patterns\n• Add personal notes' }
+                        );
+                    break;
+
+                case 'help_back':
+                    // Return to main help menu
+                    return await this.execute(interaction);
+            }
+
+            // Add back button to all detailed help pages
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('help_back')
+                        .setLabel('Back to All Commands')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+            await interaction.update({ embeds: [embed], components: [row] });
+
+        } catch (error) {
+            console.error('Error handling help button:', error);
+            await interaction.reply({ 
+                content: 'There was an error processing your request.',
+                ephemeral: true 
+            });
+        }
+    }
 };
 
 async function showCommandHelp(message, command) {
