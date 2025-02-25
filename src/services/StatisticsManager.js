@@ -198,6 +198,61 @@ class StatisticsManager {
 
         return { dates, counts, distribution };
     }
+
+    async getUserStats(userId) {
+        try {
+            const stats = this.loadStats();
+            const userStats = stats[userId] || {
+                moods: [],
+                lastUpdate: null
+            };
+
+            const todayChanges = this.countTodayChanges(userStats.moods);
+            const totalChanges = userStats.moods.length;
+            const mostCommonMood = this.getMostCommonMood(userStats.moods);
+
+            return {
+                todayChanges,
+                totalChanges,
+                mostCommonMood
+            };
+        } catch (error) {
+            console.error('Error getting user stats:', error);
+            throw error;
+        }
+    }
+
+    loadStats() {
+        try {
+            const fs = require('fs');
+            if (!fs.existsSync(this.statsFile)) {
+                return {};
+            }
+            return JSON.parse(fs.readFileSync(this.statsFile, 'utf8'));
+        } catch (error) {
+            console.error('Error loading stats:', error);
+            return {};
+        }
+    }
+
+    countTodayChanges(moods) {
+        const today = new Date().toDateString();
+        return moods.filter(mood => 
+            new Date(mood.timestamp).toDateString() === today
+        ).length;
+    }
+
+    getMostCommonMood(moods) {
+        if (!moods.length) return 'None';
+        
+        const counts = moods.reduce((acc, mood) => {
+            acc[mood.type] = (acc[mood.type] || 0) + 1;
+            return acc;
+        }, {});
+
+        return Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])[0][0];
+    }
 }
 
 module.exports = StatisticsManager; 
