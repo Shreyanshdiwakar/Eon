@@ -212,13 +212,97 @@ client.on(Events.InteractionCreate, async interaction => {
     try {
         // Handle button interactions
         if (interaction.isButton()) {
-            console.log('Button clicked:', interaction.customId);
+            const customId = interaction.customId;
+            console.log('Button clicked:', customId);
             
-            if (interaction.customId.startsWith('help_')) {
+            if (customId.startsWith('help_')) {
                 const helpCommand = client.commands.get('help');
                 if (helpCommand) {
                     await helpCommand.handleButton(interaction);
                 }
+            } 
+            else if (customId.startsWith('menu_')) {
+                // Handle menu buttons
+                if (customId === 'menu_moods') {
+                    // Show mood selection
+                    await interaction.update({ 
+                        content: "Choose your mood:", 
+                        components: createMoodButtons(0) 
+                    });
+                } 
+                else if (customId === 'menu_stats') {
+                    // Show stats
+                    const statsCommand = client.commands.get('stats');
+                    if (statsCommand) {
+                        await statsCommand.execute(interaction);
+                    }
+                }
+                else if (customId === 'menu_suggest') {
+                    // Get mood suggestions
+                    const suggestions = await moodSuggester.suggestMood(interaction);
+                    const suggestionRows = createSuggestionButtons(suggestions);
+                    suggestionRows.push(createBackRow());
+                    
+                    await interaction.update({
+                        content: "Here are some mood suggestions based on your patterns and the time of day:",
+                        components: suggestionRows
+                    });
+                }
+                else if (customId === 'menu_journal') {
+                    const journalSummary = await journalManager.generateDailySummary(interaction.user.id);
+                    await interaction.update({
+                        content: "Your mood journal:",
+                        embeds: [journalSummary],
+                        components: [createBackRow()]
+                    });
+                }
+                else if (customId === 'menu_predict') {
+                    const prediction = await moodPredictor.predictTomorrowsMood();
+                    await interaction.update({
+                        content: "Your mood prediction for tomorrow:",
+                        embeds: [prediction],
+                        components: [createBackRow()]
+                    });
+                }
+                else if (customId === 'menu_back') {
+                    // Return to main menu
+                    await interaction.update({
+                        content: "Choose an option:",
+                        components: createMainMenu(),
+                        embeds: []
+                    });
+                }
+            }
+            else if (customId.startsWith('mood_')) {
+                // Handle mood selection
+                const selectedMood = customId.split('_')[1];
+                try {
+                    const igManager = new InstagramManager();
+                    const result = await igManager.updateProfilePicture(interaction.user.id, selectedMood);
+                    
+                    await interaction.update({
+                        content: `Your mood has been updated to ${selectedMood}!`,
+                        components: createMainMenu(),
+                        embeds: []
+                    });
+                } catch (error) {
+                    console.error('Error updating mood:', error);
+                    await interaction.update({
+                        content: `Error updating mood: ${error.message}`,
+                        components: createMainMenu(),
+                        embeds: []
+                    });
+                }
+            }
+            else if (customId.startsWith('next_') || customId.startsWith('prev_')) {
+                // Handle pagination
+                const currentPage = parseInt(customId.split('_')[1]);
+                const newPage = customId.startsWith('next_') ? currentPage + 1 : currentPage - 1;
+                
+                await interaction.update({
+                    content: "Choose your mood:",
+                    components: createMoodButtons(newPage)
+                });
             }
         }
         
